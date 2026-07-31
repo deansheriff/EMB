@@ -1,0 +1,18 @@
+{
+  "name": "emb-chronicles/website",
+  "description": "EMB Chronicles fertility education and appointment platform",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": "^8.2",
+    "ext-curl": "*",
+    "ext-fileinfo": "*",
+    "ext-mbstring": "*",
+    "ext-pdo": "*",
+    "phpmailer/phpmailer": "^7.0"
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}

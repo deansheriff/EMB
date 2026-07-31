@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.openai
+node_modules
+vendor
+composer.phar
+storage/logs/*
+storage/grant-documents/*
+public/uploads/*
+tests
+npm-debug.log*
+Dockerfile*
+README.md

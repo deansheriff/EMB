@@ -1,0 +1,10 @@
+/.env
+/node_modules/
+/vendor/
+/composer.phar
+/public/uploads/*
+!/public/uploads/.gitkeep
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/grant-documents/*
+!/storage/grant-documents/.gitkeep
