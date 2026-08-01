@@ -1,5 +1,5 @@
 <section class="page-hero">
-    <div class="mx-auto grid max-w-content items-end gap-10 px-5 py-16 lg:grid-cols-[1fr_.9fr] lg:px-6 lg:py-24">
+    <div class="mx-auto grid max-w-content items-end gap-10 px-5 py-16 <?= !empty($service['cover_image']) ? 'lg:grid-cols-[1fr_.9fr]' : '' ?> lg:px-6 lg:py-24">
         <div>
             <nav class="breadcrumb"><a href="<?= e(url('/services')) ?>">Services</a><span>/</span><span><?= e($service['title']) ?></span></nav>
             <span class="chip mt-7">Fertility consultation</span>
@@ -7,7 +7,7 @@
             <p class="mt-6 max-w-2xl text-lg leading-8 text-muted"><?= e($service['excerpt']) ?></p>
             <a class="button button-primary mt-8" href="<?= e(url('/appointment?service=' . rawurlencode($service['title']))) ?>">Book this session</a>
         </div>
-        <img src="<?= e(media_url($service['cover_image'])) ?>" alt="<?= e($service['cover_alt']) ?>" class="aspect-[4/3] w-full rounded-[28px] object-cover shadow-soft">
+        <?php if (!empty($service['cover_image'])): ?><img src="<?= e(media_url($service['cover_image'])) ?>" alt="<?= e($service['cover_alt']) ?>" class="aspect-[4/3] w-full rounded-[28px] object-cover shadow-soft"><?php endif; ?>
     </div>
 </section>
 
@@ -60,4 +60,3 @@
     </div>
 </section>
 <?php endif; ?>
-

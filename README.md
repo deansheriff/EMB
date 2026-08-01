@@ -21,6 +21,7 @@ Approved design source: [EMB Chronicles on Google Stitch](https://stitch.withgoo
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260731_email_payments.sql"
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260731_rbac.sql"
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260731_grant_forms.sql"
+   C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260801_editable_page_media.sql"
    ```
 
 3. Install PHP and frontend dependencies, then build the stylesheet:
@@ -53,6 +54,19 @@ php -r "echo password_hash('your-new-password', PASSWORD_DEFAULT), PHP_EOL;"
 Then update the `admins.password_hash` value in MySQL.
 
 The initial administrator is assigned the protected **Super Administrator** role.
+
+## Managing site images
+
+Every public-facing image can be replaced or removed from the admin panel:
+
+- **Hero slides** manages homepage hero images.
+- **Page content** manages the homepage welcome image, both About page images, and the FIYFF hero image.
+- **Services** manages service covers and gallery images.
+- **Events** manages event and grant covers and gallery images.
+- **Testimonials** manages client photos.
+- **Site settings** manages the header logo.
+
+Image fields accept a JPG, PNG, or WebP upload, a local `/uploads/...` path, or a full external URL. Add descriptive alt text whenever an image is present. Removing an image also removes its alt text; removing a hero image deactivates that slide.
 
 ## Roles and administrator access
 

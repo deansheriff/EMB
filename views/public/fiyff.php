@@ -1,5 +1,6 @@
+<?php $fiyffMission = page_section('fiyff', 'mission'); ?>
 <section class="page-hero overflow-hidden">
-    <div class="mx-auto grid max-w-content items-center gap-12 px-5 py-20 lg:grid-cols-[1fr_.9fr] lg:px-6 lg:py-28">
+    <div class="mx-auto grid max-w-content items-center gap-12 px-5 py-20 <?= !empty($fiyffMission['image_path']) ? 'lg:grid-cols-[1fr_.9fr]' : '' ?> lg:px-6 lg:py-28">
         <div>
             <p class="eyebrow">Fatima Ibrahim Yakubu Fertility Foundation</p>
             <h1 class="page-title mt-5">Making the path to parenthood more supported</h1>
@@ -9,10 +10,10 @@
                 <a class="button button-secondary" href="<?= e(url('/contact')) ?>">Partner with FIYFF</a>
             </div>
         </div>
-        <div class="relative">
-            <img src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=85" alt="A diverse group sharing a supportive conversation" class="aspect-[4/5] w-full rounded-[28px] object-cover shadow-soft">
+        <?php if (!empty($fiyffMission['image_path'])): ?><div class="relative">
+            <img src="<?= e(media_url($fiyffMission['image_path'])) ?>" alt="<?= e($fiyffMission['image_alt']) ?>" class="aspect-[4/5] w-full rounded-[28px] object-cover shadow-soft">
             <div class="absolute -bottom-6 left-4 rounded-2xl bg-wine p-6 text-white lg:-left-8"><p class="font-display text-2xl">Awareness · Advocacy · Aid</p></div>
-        </div>
+        </div><?php endif; ?>
     </div>
 </section>
 
@@ -40,8 +41,8 @@
 <?php if ($grant): ?>
 <section class="section">
     <div class="mx-auto max-w-content px-5 lg:px-6">
-        <article class="grid overflow-hidden rounded-[28px] border border-line bg-white shadow-soft lg:grid-cols-2">
-            <img src="<?= e(media_url($grant['cover_image'])) ?>" alt="<?= e($grant['cover_alt']) ?>" class="h-full min-h-[360px] w-full object-cover">
+        <article class="grid overflow-hidden rounded-[28px] border border-line bg-white shadow-soft <?= !empty($grant['cover_image']) ? 'lg:grid-cols-2' : '' ?>">
+            <?php if (!empty($grant['cover_image'])): ?><img src="<?= e(media_url($grant['cover_image'])) ?>" alt="<?= e($grant['cover_alt']) ?>" class="h-full min-h-[360px] w-full object-cover"><?php endif; ?>
             <div class="p-8 lg:p-12">
                 <div class="flex flex-wrap gap-2"><span class="chip">Grant program</span><span class="chip chip-featured">Featured</span></div>
                 <p class="mt-8 font-display text-5xl text-wine">₦500,000</p>
@@ -88,4 +89,3 @@
         </div>
     </div>
 </section>
-

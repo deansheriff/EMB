@@ -24,7 +24,7 @@
             <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 <?php foreach ($events as $event): ?>
                     <article class="event-card <?= $event['is_featured'] ? 'md:col-span-2 lg:col-span-1' : '' ?>">
-                        <a href="<?= e(url('/events/' . $event['slug'])) ?>"><img class="aspect-[4/3] w-full rounded-t-[20px] object-cover" src="<?= e(media_url($event['cover_image'])) ?>" alt="<?= e($event['cover_alt']) ?>" loading="lazy"></a>
+                        <?php if (!empty($event['cover_image'])): ?><a href="<?= e(url('/events/' . $event['slug'])) ?>"><img class="aspect-[4/3] w-full rounded-t-[20px] object-cover" src="<?= e(media_url($event['cover_image'])) ?>" alt="<?= e($event['cover_alt']) ?>" loading="lazy"></a><?php endif; ?>
                         <div class="p-6">
                             <div class="flex flex-wrap gap-2"><span class="chip"><?= e($event['event_type']) ?></span><?php if ($event['is_featured']): ?><span class="chip chip-featured">Featured</span><?php endif; ?></div>
                             <h2 class="mt-5 font-display text-2xl text-wine"><a href="<?= e(url('/events/' . $event['slug'])) ?>"><?= e($event['title']) ?></a></h2>
@@ -46,4 +46,3 @@
         <?php endif; ?>
     </div>
 </section>
-

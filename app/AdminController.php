@@ -184,7 +184,10 @@ function save_event(): never
     $existing = $id ? query_one('SELECT * FROM events WHERE id = ?', [$id]) : null;
     $cover = $existing['cover_image'] ?? '';
     $coverAlt = trim((string) ($_POST['cover_alt'] ?? ($existing['cover_alt'] ?? '')));
-    if (!empty($_FILES['cover_image']['name'])) {
+    if (!empty($_POST['remove_cover'])) {
+        $cover = '';
+        $coverAlt = '';
+    } elseif (!empty($_FILES['cover_image']['name'])) {
         try {
             $media = MediaUploader::store($_FILES['cover_image'], $coverAlt);
             $cover = $media['path'];
@@ -193,11 +196,15 @@ function save_event(): never
             flash('error', $exception->getMessage());
             redirect('/admin/events' . ($id ? '?edit=' . $id : ''));
         }
+    } elseif (array_key_exists('cover_url', $_POST)) {
+        $cover = trim((string) $_POST['cover_url']);
     }
-    $cover = $cover ?: trim((string) ($_POST['cover_url'] ?? ''));
-    if ($cover === '' || $coverAlt === '') {
-        flash('error', 'A cover image and descriptive alt text are required.');
+    if ($cover !== '' && $coverAlt === '') {
+        flash('error', 'Descriptive alt text is required when a cover image is used.');
         redirect('/admin/events' . ($id ? '?edit=' . $id : ''));
+    }
+    if ($cover === '') {
+        $coverAlt = '';
     }
     $slug = slugify((string) ($_POST['slug'] ?: $title));
     $values = [
@@ -222,6 +229,7 @@ function save_event(): never
         db()->prepare($sql)->execute($values);
         $id = (int) db()->lastInsertId();
     }
+    remove_gallery_media('event', $id, $_POST['remove_gallery'] ?? []);
     save_gallery('event', $id, $_FILES['gallery'] ?? null, $_POST['gallery_alt'] ?? []);
     audit('save', 'event', $id);
     flash('success', 'Event saved successfully.');
@@ -259,7 +267,10 @@ function save_service(): never
     $existing = $id ? query_one('SELECT * FROM services WHERE id = ?', [$id]) : null;
     $cover = $existing['cover_image'] ?? '';
     $coverAlt = trim((string) ($_POST['cover_alt'] ?? ($existing['cover_alt'] ?? '')));
-    if (!empty($_FILES['cover_image']['name'])) {
+    if (!empty($_POST['remove_cover'])) {
+        $cover = '';
+        $coverAlt = '';
+    } elseif (!empty($_FILES['cover_image']['name'])) {
         try {
             $media = MediaUploader::store($_FILES['cover_image'], $coverAlt);
             $cover = $media['path'];
@@ -267,11 +278,15 @@ function save_service(): never
             flash('error', $exception->getMessage());
             redirect('/admin/services' . ($id ? '?edit=' . $id : ''));
         }
+    } elseif (array_key_exists('cover_url', $_POST)) {
+        $cover = trim((string) $_POST['cover_url']);
     }
-    $cover = $cover ?: trim((string) ($_POST['cover_url'] ?? ''));
-    if ($cover === '' || $coverAlt === '') {
-        flash('error', 'A cover image and alt text are required.');
+    if ($cover !== '' && $coverAlt === '') {
+        flash('error', 'Alt text is required when a cover image is used.');
         redirect('/admin/services' . ($id ? '?edit=' . $id : ''));
+    }
+    if ($cover === '') {
+        $coverAlt = '';
     }
     $values = [
         $title, slugify((string) ($_POST['slug'] ?: $title)), $excerptText,
@@ -287,6 +302,7 @@ function save_service(): never
         db()->prepare('INSERT INTO services (title, slug, excerpt, description, cover_image, cover_alt, sort_order, is_pinned, status, seo_title, seo_description) VALUES (?,?,?,?,?,?,?,?,?,?,?)')->execute($values);
         $id = (int) db()->lastInsertId();
     }
+    remove_gallery_media('service', $id, $_POST['remove_gallery'] ?? []);
     save_gallery('service', $id, $_FILES['gallery'] ?? null, $_POST['gallery_alt'] ?? []);
     audit('save', 'service', $id);
     flash('success', 'Service saved successfully.');
@@ -325,6 +341,21 @@ function save_gallery(string $type, int $parentId, ?array $files, array|string $
     }
 }
 
+function remove_gallery_media(string $type, int $parentId, mixed $mediaIds): void
+{
+    if (!is_array($mediaIds)) {
+        return;
+    }
+    $table = $type === 'event' ? 'event_media' : 'service_media';
+    $foreign = $type === 'event' ? 'event_id' : 'service_id';
+    $stmt = db()->prepare("DELETE FROM {$table} WHERE id = ? AND {$foreign} = ?");
+    foreach (array_unique(array_map('intval', $mediaIds)) as $mediaId) {
+        if ($mediaId > 0) {
+            $stmt->execute([$mediaId, $parentId]);
+        }
+    }
+}
+
 function admin_heroes(): void
 {
     if (is_post()) {
@@ -340,7 +371,10 @@ function admin_heroes(): void
         $existing = $id ? query_one('SELECT * FROM hero_slides WHERE id = ?', [$id]) : null;
         $image = $existing['image_path'] ?? trim((string) ($_POST['image_url'] ?? ''));
         $alt = trim((string) ($_POST['image_alt'] ?? ($existing['image_alt'] ?? '')));
-        if (!empty($_FILES['image']['name'])) {
+        if (!empty($_POST['remove_image'])) {
+            $image = '';
+            $alt = '';
+        } elseif (!empty($_FILES['image']['name'])) {
             try {
                 $media = MediaUploader::store($_FILES['image'], $alt);
                 $image = $media['path'];
@@ -348,16 +382,19 @@ function admin_heroes(): void
                 flash('error', $exception->getMessage());
                 redirect('/admin/hero-slides' . ($id ? '?edit=' . $id : ''));
             }
+        } elseif (array_key_exists('image_url', $_POST)) {
+            $image = trim((string) $_POST['image_url']);
         }
-        if ($image === '' || $alt === '' || trim((string) ($_POST['headline'] ?? '')) === '') {
-            flash('error', 'Image, alt text, and headline are required.');
+        if (trim((string) ($_POST['headline'] ?? '')) === '' || ($image !== '' && $alt === '')) {
+            flash('error', 'A headline is required, and images need descriptive alt text.');
             redirect('/admin/hero-slides' . ($id ? '?edit=' . $id : ''));
         }
+        $isActive = isset($_POST['is_active']) && $image !== '' ? 1 : 0;
         $values = [
             $image, $alt, trim((string) $_POST['headline']), trim((string) ($_POST['subheading'] ?? '')),
             trim((string) ($_POST['cta_label'] ?? '')), trim((string) ($_POST['cta_link'] ?? '')),
             trim((string) ($_POST['secondary_label'] ?? '')), trim((string) ($_POST['secondary_link'] ?? '')),
-            (int) ($_POST['sort_order'] ?? 0), isset($_POST['is_active']) ? 1 : 0,
+            (int) ($_POST['sort_order'] ?? 0), $isActive,
         ];
         if ($id) {
             $values[] = $id;
@@ -389,7 +426,10 @@ function admin_testimonials(): void
         $existing = $id ? query_one('SELECT * FROM testimonials WHERE id = ?', [$id]) : null;
         $photo = $existing['photo_path'] ?? trim((string) ($_POST['photo_url'] ?? ''));
         $alt = trim((string) ($_POST['photo_alt'] ?? ($existing['photo_alt'] ?? '')));
-        if (!empty($_FILES['photo']['name'])) {
+        if (!empty($_POST['remove_photo'])) {
+            $photo = '';
+            $alt = '';
+        } elseif (!empty($_FILES['photo']['name'])) {
             try {
                 $media = MediaUploader::store($_FILES['photo'], $alt);
                 $photo = $media['path'];
@@ -397,6 +437,15 @@ function admin_testimonials(): void
                 flash('error', $exception->getMessage());
                 redirect('/admin/testimonials' . ($id ? '?edit=' . $id : ''));
             }
+        } elseif (array_key_exists('photo_url', $_POST)) {
+            $photo = trim((string) $_POST['photo_url']);
+        }
+        if ($photo !== '' && $alt === '') {
+            flash('error', 'Photo alt text is required when a testimonial photo is used.');
+            redirect('/admin/testimonials' . ($id ? '?edit=' . $id : ''));
+        }
+        if ($photo === '') {
+            $alt = '';
         }
         $values = [
             trim((string) ($_POST['client_name'] ?? '')), $photo, $alt,
@@ -437,7 +486,9 @@ function admin_settings(): void
     $secrets = ['smtp_password', 'paystack_secret_key'];
     if (is_post()) {
         verify_csrf();
-        if (!empty($_FILES['logo']['name'])) {
+        if (!empty($_POST['remove_logo'])) {
+            $_POST['logo_path'] = '';
+        } elseif (!empty($_FILES['logo']['name'])) {
             try {
                 $media = MediaUploader::store($_FILES['logo'], (string) ($_POST['site_name'] ?? 'Emb Chronicles') . ' logo');
                 $_POST['logo_path'] = $media['path'];

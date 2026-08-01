@@ -1,12 +1,12 @@
 <section class="page-hero">
-    <div class="mx-auto grid max-w-content items-end gap-10 px-5 py-16 lg:grid-cols-[1fr_.9fr] lg:px-6 lg:py-24">
+    <div class="mx-auto grid max-w-content items-end gap-10 px-5 py-16 <?= !empty($event['cover_image']) ? 'lg:grid-cols-[1fr_.9fr]' : '' ?> lg:px-6 lg:py-24">
         <div>
             <nav class="breadcrumb"><a href="<?= e(url('/events')) ?>">Events</a><span>/</span><span><?= e($event['event_type']) ?></span></nav>
             <div class="mt-7 flex flex-wrap gap-2"><span class="chip"><?= e($event['event_type']) ?></span><?php if ($event['is_featured']): ?><span class="chip chip-featured">Featured</span><?php endif; ?></div>
             <h1 class="page-title mt-5"><?= e($event['title']) ?></h1>
             <p class="mt-6 max-w-2xl text-lg leading-8 text-muted"><?= e($event['excerpt']) ?></p>
         </div>
-        <img src="<?= e(media_url($event['cover_image'])) ?>" alt="<?= e($event['cover_alt']) ?>" class="aspect-[4/3] w-full rounded-[28px] object-cover shadow-soft">
+        <?php if (!empty($event['cover_image'])): ?><img src="<?= e(media_url($event['cover_image'])) ?>" alt="<?= e($event['cover_alt']) ?>" class="aspect-[4/3] w-full rounded-[28px] object-cover shadow-soft"><?php endif; ?>
     </div>
 </section>
 

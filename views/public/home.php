@@ -96,9 +96,9 @@
         <div class="mt-12 grid gap-6 lg:grid-cols-2">
             <?php foreach ($events as $event): ?>
                 <article class="event-card <?= $event['event_type'] === 'Grant Program' ? 'lg:row-span-2' : '' ?>">
-                    <a href="<?= e(url('/events/' . $event['slug'])) ?>" class="block overflow-hidden rounded-t-[20px]">
+                    <?php if (!empty($event['cover_image'])): ?><a href="<?= e(url('/events/' . $event['slug'])) ?>" class="block overflow-hidden rounded-t-[20px]">
                         <img class="aspect-[16/10] w-full object-cover transition duration-500 hover:scale-[1.03]" src="<?= e(media_url($event['cover_image'])) ?>" alt="<?= e($event['cover_alt']) ?>" loading="lazy">
-                    </a>
+                    </a><?php endif; ?>
                     <div class="p-6 lg:p-7">
                         <div class="flex flex-wrap gap-2">
                             <span class="chip"><?= e($event['event_type']) ?></span>
@@ -126,9 +126,9 @@
         <div class="mt-12 grid gap-6 md:grid-cols-3">
             <?php foreach ($services as $service): ?>
                 <article class="service-card">
-                    <a href="<?= e(url('/services/' . $service['slug'])) ?>">
+                    <?php if (!empty($service['cover_image'])): ?><a href="<?= e(url('/services/' . $service['slug'])) ?>">
                         <img src="<?= e(media_url($service['cover_image'])) ?>" alt="<?= e($service['cover_alt']) ?>" class="aspect-[4/3] w-full object-cover" loading="lazy">
-                    </a>
+                    </a><?php endif; ?>
                     <div class="p-6">
                         <h3 class="font-display text-2xl text-wine"><a href="<?= e(url('/services/' . $service['slug'])) ?>"><?= e($service['title']) ?></a></h3>
                         <p class="mt-3 text-sm leading-6 text-muted"><?= e($service['excerpt']) ?></p>

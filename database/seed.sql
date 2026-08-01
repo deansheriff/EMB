@@ -193,9 +193,11 @@ VALUES
 ('home', 'why', 'Why we exist', 'Science and hope belong in the same conversation',
  '<p>To be your safe space for everything needed on your fertility journey.</p>', '', '', 'Contact us', '/contact', 'published'),
 ('about', 'intro', 'Who we are', 'Science, empathy, and a clear way forward',
- '<p>Emb Chronicles makes fertility education accessible, compassionate, and science-driven. We turn clinical complexity into language people can use, questions they can ask, and decisions they can approach with confidence.</p>', '', '', '', '', 'published'),
+ '<p>Emb Chronicles makes fertility education accessible, compassionate, and science-driven. We turn clinical complexity into language people can use, questions they can ask, and decisions they can approach with confidence.</p>', 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1200&q=85', 'A Black female health professional in a bright clinical environment', '', '', 'published'),
+('about', 'guide', 'Meet your guide', 'Zubaida’s dream-chasing philosophy',
+ '<p>With a B.Sc. in Microbiology and advanced post-graduate certification in Assisted Reproductive Technology from IMSA, Zubaida has spent nearly four years working in a leading fertility-clinic environment in Abuja.</p><p>Emb Chronicles grew from a simple conviction: people deserve the context, language, and confidence to participate more fully in decisions about their bodies, treatment, and careers.</p>', 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1200&q=85', 'A mentor speaking with people around a table', 'Book a conversation', '/appointment', 'published'),
 ('fiyff', 'mission', 'Fatima Ibrahim Yakubu Fertility Foundation', 'Making the path to parenthood more supported',
- '<p>FIYFF is the foundation arm of Emb Chronicles, dedicated to fertility awareness, advocacy, and practical financial support for eligible couples.</p>', '', '', '', '', 'published'),
+ '<p>FIYFF is the foundation arm of Emb Chronicles, dedicated to fertility awareness, advocacy, and practical financial support for eligible couples.</p>', 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=85', 'A diverse group sharing a supportive conversation', '', '', 'published'),
 ('community', 'vision', 'The vision', 'Your degree is not a dead end',
  '<p>“I know what it feels like to hold a Microbiology degree and wonder if it was all worth it. The path to becoming a Clinical Embryologist or STEM leader is not closed—it is waiting for the right roadmap.”</p>', '', '', '', '', 'published')
 ON DUPLICATE KEY UPDATE eyebrow = VALUES(eyebrow), heading = VALUES(heading), content = VALUES(content);

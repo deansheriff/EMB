@@ -175,16 +175,22 @@ function setting(string $key, mixed $default = ''): mixed
     return $settings[$key] ?? $default;
 }
 
-function page_content(string $page, string $section, string $default = ''): string
+function page_section(string $page, string $section): ?array
 {
     static $cache = [];
     $key = $page . ':' . $section;
     if (!array_key_exists($key, $cache)) {
-        $stmt = db()->prepare("SELECT content FROM page_content WHERE page_key = ? AND section_key = ? AND status = 'published' LIMIT 1");
+        $stmt = db()->prepare("SELECT * FROM page_content WHERE page_key = ? AND section_key = ? AND status = 'published' LIMIT 1");
         $stmt->execute([$page, $section]);
-        $cache[$key] = $stmt->fetchColumn() ?: $default;
+        $cache[$key] = $stmt->fetch() ?: null;
     }
     return $cache[$key];
+}
+
+function page_content(string $page, string $section, string $default = ''): string
+{
+    $managedSection = page_section($page, $section);
+    return $managedSection ? (string) $managedSection['content'] : $default;
 }
 
 function auth_user(): ?array

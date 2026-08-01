@@ -39,7 +39,7 @@
         <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <?php foreach ($services as $service): ?>
                 <article class="service-card">
-                    <a href="<?= e(url('/services/' . $service['slug'])) ?>"><img class="aspect-[4/3] w-full object-cover" src="<?= e(media_url($service['cover_image'])) ?>" alt="<?= e($service['cover_alt']) ?>" loading="lazy"></a>
+                    <?php if (!empty($service['cover_image'])): ?><a href="<?= e(url('/services/' . $service['slug'])) ?>"><img class="aspect-[4/3] w-full object-cover" src="<?= e(media_url($service['cover_image'])) ?>" alt="<?= e($service['cover_alt']) ?>" loading="lazy"></a><?php endif; ?>
                     <div class="p-6">
                         <h3 class="font-display text-2xl text-wine"><a href="<?= e(url('/services/' . $service['slug'])) ?>"><?= e($service['title']) ?></a></h3>
                         <p class="mt-3 text-sm leading-6 text-muted"><?= e($service['excerpt']) ?></p>
@@ -75,4 +75,3 @@
         </div>
     </div>
 </section>
-

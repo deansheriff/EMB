@@ -71,6 +71,12 @@ if [ "${DB_BOOTSTRAP:-true}" = "true" ]; then
     echo "Applying managed grant-form migration."
     run_sql_file /var/www/html/database/migrations/20260731_grant_forms.sql
   fi
+
+  editable_page_media_count="$(mysql_command --batch --skip-column-names --execute="SELECT COUNT(*) FROM page_content WHERE page_key = 'about' AND section_key = 'guide'")"
+  if [ "${editable_page_media_count}" = "0" ]; then
+    echo "Making static page images editable."
+    run_sql_file /var/www/html/database/migrations/20260801_editable_page_media.sql
+  fi
 fi
 
 exec "$@"

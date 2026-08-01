@@ -1,11 +1,23 @@
+<?php
+$aboutIntro = page_section('about', 'intro');
+$aboutGuide = page_section('about', 'guide') ?: [
+    'eyebrow' => 'Meet your guide',
+    'heading' => 'Zubaida’s dream-chasing philosophy',
+    'content' => '<p>With a B.Sc. in Microbiology and advanced post-graduate certification in Assisted Reproductive Technology from IMSA, Zubaida has spent nearly four years working in a leading fertility-clinic environment in Abuja.</p><p>Emb Chronicles grew from a simple conviction: people deserve the context, language, and confidence to participate more fully in decisions about their bodies, treatment, and careers.</p>',
+    'image_path' => '',
+    'image_alt' => '',
+];
+?>
 <section class="page-hero">
-    <div class="mx-auto grid max-w-content items-end gap-10 px-5 py-20 lg:grid-cols-[1fr_.82fr] lg:px-6 lg:py-28">
+    <div class="mx-auto grid max-w-content items-end gap-10 px-5 py-20 <?= !empty($aboutIntro['image_path']) ? 'lg:grid-cols-[1fr_.82fr]' : '' ?> lg:px-6 lg:py-28">
         <div>
             <p class="eyebrow">About Emb Chronicles</p>
             <h1 class="page-title mt-5">Science, empathy, and a clear way forward</h1>
             <p class="mt-6 max-w-2xl text-lg leading-8 text-muted">Fertility information should create clarity—not more fear. We make complex science easier to understand while protecting space for the human experience behind every question.</p>
         </div>
-        <img src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1200&q=85" alt="A Black female health professional in a bright clinical environment" class="aspect-[4/3] w-full rounded-[28px] object-cover shadow-soft">
+        <?php if (!empty($aboutIntro['image_path'])): ?>
+            <img src="<?= e(media_url($aboutIntro['image_path'])) ?>" alt="<?= e($aboutIntro['image_alt']) ?>" class="aspect-[4/3] w-full rounded-[28px] object-cover shadow-soft">
+        <?php endif; ?>
     </div>
 </section>
 
@@ -20,15 +32,14 @@
 </section>
 
 <section class="section">
-    <div class="mx-auto grid max-w-content items-center gap-12 px-5 lg:grid-cols-2 lg:px-6">
-        <img src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1200&q=85" alt="A mentor speaking with people around a table" class="aspect-[4/5] w-full rounded-[28px] object-cover">
-        <div class="lg:pl-10">
-            <p class="eyebrow">Meet your guide</p>
-            <h2 class="section-heading mt-4">Zubaida’s dream-chasing philosophy</h2>
-            <div class="prose-warm mt-6">
-                <p>With a B.Sc. in Microbiology and advanced post-graduate certification in Assisted Reproductive Technology from IMSA, Zubaida has spent nearly four years working in a leading fertility-clinic environment in Abuja.</p>
-                <p>Emb Chronicles grew from a simple conviction: people deserve the context, language, and confidence to participate more fully in decisions about their bodies, treatment, and careers.</p>
-            </div>
+    <div class="mx-auto grid max-w-content items-center gap-12 px-5 <?= !empty($aboutGuide['image_path']) ? 'lg:grid-cols-2' : '' ?> lg:px-6">
+        <?php if (!empty($aboutGuide['image_path'])): ?>
+            <img src="<?= e(media_url($aboutGuide['image_path'])) ?>" alt="<?= e($aboutGuide['image_alt']) ?>" class="aspect-[4/5] w-full rounded-[28px] object-cover">
+        <?php endif; ?>
+        <div class="<?= !empty($aboutGuide['image_path']) ? 'lg:pl-10' : 'mx-auto max-w-3xl text-center' ?>">
+            <p class="eyebrow"><?= e($aboutGuide['eyebrow'] ?: 'Meet your guide') ?></p>
+            <h2 class="section-heading mt-4"><?= e($aboutGuide['heading'] ?: 'Zubaida’s dream-chasing philosophy') ?></h2>
+            <div class="prose-warm mt-6"><?= $aboutGuide['content'] ?></div>
             <a class="button button-primary mt-8" href="<?= e(url('/appointment')) ?>">Book a conversation</a>
         </div>
     </div>
@@ -66,4 +77,3 @@
         </div>
     </div>
 </section>
-
