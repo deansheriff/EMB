@@ -26,6 +26,7 @@ function admin_dispatch(string $path): void
         '/admin/settings' => 'settings.manage',
         '/admin/contact-submissions' => 'contacts.manage',
         '/admin/appointments' => 'appointments.manage',
+        '/admin/availability' => 'appointments.manage',
         '/admin/email-log' => 'email_log.view',
         '/admin/page-content' => 'content.manage',
         '/admin/grant-forms' => 'grants.manage',
@@ -35,6 +36,11 @@ function admin_dispatch(string $path): void
     ];
     if (isset($routePermissions[$path])) {
         require_permission($routePermissions[$path]);
+    }
+    if ($path === '/admin/data-tools' && !can_any(['services.manage', 'events.manage', 'testimonials.manage', 'contacts.manage', 'grants.manage'])) {
+        http_response_code(403);
+        render('errors/403', ['title' => 'Access denied'], 'admin');
+        return;
     }
     if (preg_match('#^/admin/grant-documents/(\d+)$#', $path, $matches)) {
         require_permission('grants.manage');
@@ -68,6 +74,12 @@ function admin_dispatch(string $path): void
         case '/admin/appointments':
             admin_appointments();
             return;
+        case '/admin/availability':
+            admin_availability();
+            return;
+        case '/admin/data-tools':
+            admin_data_tools();
+            return;
         case '/admin/email-log':
             admin_email_log();
             return;
@@ -89,7 +101,7 @@ function admin_dispatch(string $path): void
     }
 
     http_response_code(404);
-    render('errors/404', ['title' => 'Admin page not found'], 'admin');
+    render('errors/404', ['title' => 'Admin page not found', 'adminError' => true], 'admin');
 }
 
 function admin_login(): void
@@ -479,11 +491,13 @@ function admin_settings(): void
         'instagram', 'tiktok', 'footer_blurb', 'stats_members', 'stats_families',
         'logo_path', 'default_meta_title', 'default_meta_description',
         'social_share_image', 'social_share_image_alt',
+        'maintenance_title', 'maintenance_message', 'maintenance_end_at',
+        'deployment_status_message', 'deployment_status_url',
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_from_email',
         'smtp_from_name', 'smtp_reply_to', 'smtp_admin_email',
         'paystack_public_key', 'paystack_currency', 'appointment_fee',
     ];
-    $booleans = ['smtp_enabled', 'email_confirmations_enabled', 'paystack_enabled'];
+    $booleans = ['smtp_enabled', 'email_confirmations_enabled', 'paystack_enabled', 'maintenance_enabled'];
     $secrets = ['smtp_password', 'paystack_secret_key'];
     if (is_post()) {
         verify_csrf();
@@ -536,6 +550,20 @@ function admin_settings(): void
                 redirect('/admin/settings');
             }
         }
+        $statusUrl = trim((string) ($_POST['deployment_status_url'] ?? ''));
+        if ($statusUrl !== '' && !filter_var($statusUrl, FILTER_VALIDATE_URL)) {
+            flash('error', 'Enter a valid deployment status URL or leave it blank.');
+            redirect('/admin/settings');
+        }
+        $maintenanceEnd = trim((string) ($_POST['maintenance_end_at'] ?? ''));
+        if ($maintenanceEnd !== '') {
+            try {
+                $_POST['maintenance_end_at'] = (new DateTimeImmutable($maintenanceEnd))->format('Y-m-d H:i:s');
+            } catch (Throwable) {
+                flash('error', 'Enter a valid expected return date and time.');
+                redirect('/admin/settings');
+            }
+        }
         $port = (int) ($_POST['smtp_port'] ?? 587);
         if ($port < 1 || $port > 65535) {
             flash('error', 'SMTP port must be between 1 and 65535.');
@@ -573,7 +601,9 @@ function admin_settings(): void
                     $key === 'appointment_fee' => 'money',
                     in_array($key, ['smtp_from_email', 'smtp_reply_to', 'smtp_admin_email'], true) => 'email',
                     in_array($key, ['logo_path', 'social_share_image'], true) => 'image',
-                    in_array($key, ['default_meta_description', 'footer_blurb'], true) => 'textarea',
+                    in_array($key, ['default_meta_description', 'footer_blurb', 'maintenance_message'], true) => 'textarea',
+                    $key === 'maintenance_end_at' => 'datetime',
+                    $key === 'deployment_status_url' => 'url',
                     default => 'text',
                 };
                 $stmt->execute([$key, trim((string) $_POST[$key]), $type]);
@@ -687,6 +717,127 @@ function admin_appointments(): void
         ? query_all('SELECT * FROM appointment_payments WHERE appointment_id = ? ORDER BY created_at DESC', [$selected['id']])
         : [];
     render('admin/appointments', compact('appointments', 'selected', 'payments', 'paymentFilter') + ['title' => 'Appointments'], 'admin');
+}
+
+function admin_availability(): void
+{
+    if (is_post()) {
+        verify_csrf();
+        $action = (string) ($_POST['action'] ?? 'save_settings');
+        if ($action === 'save_settings') {
+            $windowDays = max(1, min(365, (int) ($_POST['appointment_booking_window_days'] ?? 60)));
+            $noticeHours = max(0, min(720, (int) ($_POST['appointment_min_notice_hours'] ?? 24)));
+            $dailyLimit = max(1, min(100, (int) ($_POST['appointment_daily_limit'] ?? 6)));
+            $stmt = db()->prepare(
+                'INSERT INTO site_settings (`key`, `value`, `type`) VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), `type`=VALUES(`type`)'
+            );
+            foreach ([
+                ['appointment_booking_enabled', isset($_POST['appointment_booking_enabled']) ? '1' : '0', 'boolean'],
+                ['appointment_booking_window_days', (string) $windowDays, 'number'],
+                ['appointment_min_notice_hours', (string) $noticeHours, 'number'],
+                ['appointment_daily_limit', (string) $dailyLimit, 'number'],
+            ] as $setting) {
+                $stmt->execute($setting);
+            }
+            audit('save_settings', 'appointment_availability', null);
+            flash('success', 'Booking availability settings saved.');
+        } elseif ($action === 'save_slot') {
+            $id = (int) ($_POST['id'] ?? 0);
+            $weekday = (int) ($_POST['weekday'] ?? 0);
+            $startTime = trim((string) ($_POST['start_time'] ?? ''));
+            $duration = (int) ($_POST['duration_minutes'] ?? 60);
+            $capacity = (int) ($_POST['capacity'] ?? 1);
+            if ($weekday < 1 || $weekday > 7 || !preg_match('/^\d{2}:\d{2}$/', $startTime) || $duration < 15 || $duration > 480 || $capacity < 1 || $capacity > 50) {
+                flash('error', 'Choose a valid weekday, start time, duration, and booking limit.');
+                redirect('/admin/availability');
+            }
+            try {
+                if ($id) {
+                    db()->prepare('UPDATE appointment_availability_slots SET weekday=?, start_time=?, duration_minutes=?, capacity=?, is_active=? WHERE id=?')
+                        ->execute([$weekday, $startTime, $duration, $capacity, isset($_POST['is_active']) ? 1 : 0, $id]);
+                } else {
+                    db()->prepare(
+                        'INSERT INTO appointment_availability_slots (weekday, start_time, duration_minutes, capacity, is_active)
+                         VALUES (?, ?, ?, ?, ?)
+                         ON DUPLICATE KEY UPDATE duration_minutes=VALUES(duration_minutes), capacity=VALUES(capacity), is_active=VALUES(is_active)'
+                    )->execute([$weekday, $startTime, $duration, $capacity, isset($_POST['is_active']) ? 1 : 0]);
+                    $id = (int) db()->lastInsertId();
+                }
+            } catch (PDOException) {
+                flash('error', 'That weekday and start time already exist. Edit the existing slot instead.');
+                redirect('/admin/availability');
+            }
+            audit('save_slot', 'appointment_availability', $id ?: null);
+            flash('success', 'Time slot saved.');
+        } elseif ($action === 'delete_slot') {
+            $id = (int) ($_POST['id'] ?? 0);
+            db()->prepare('DELETE FROM appointment_availability_slots WHERE id = ?')->execute([$id]);
+            audit('delete_slot', 'appointment_availability', $id);
+            flash('success', 'Time slot removed. Existing appointments were preserved.');
+        } elseif ($action === 'block_date') {
+            $date = trim((string) ($_POST['blocked_date'] ?? ''));
+            $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+            if (!$parsed || $parsed->format('Y-m-d') !== $date || $parsed < new DateTimeImmutable('today')) {
+                flash('error', 'Choose a valid date to block.');
+                redirect('/admin/availability');
+            }
+            db()->prepare(
+                'INSERT INTO appointment_blocked_dates (blocked_date, reason) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE reason=VALUES(reason)'
+            )->execute([$date, trim((string) ($_POST['reason'] ?? ''))]);
+            audit('block_date', 'appointment_availability', null);
+            flash('success', 'Date blocked from new bookings.');
+        } elseif ($action === 'unblock_date') {
+            $id = (int) ($_POST['id'] ?? 0);
+            db()->prepare('DELETE FROM appointment_blocked_dates WHERE id = ?')->execute([$id]);
+            audit('unblock_date', 'appointment_availability', $id);
+            flash('success', 'Date reopened for bookings.');
+        }
+        redirect('/admin/availability');
+    }
+
+    $slots = query_all('SELECT * FROM appointment_availability_slots ORDER BY weekday, start_time');
+    $blockedDates = query_all('SELECT * FROM appointment_blocked_dates WHERE blocked_date >= CURRENT_DATE ORDER BY blocked_date');
+    $availabilitySettings = [
+        'enabled' => (string) setting('appointment_booking_enabled', '1') === '1',
+        'window_days' => (int) setting('appointment_booking_window_days', 60),
+        'notice_hours' => (int) setting('appointment_min_notice_hours', 24),
+        'daily_limit' => (int) setting('appointment_daily_limit', 6),
+    ];
+    render('admin/availability', compact('slots', 'blockedDates', 'availabilitySettings') + ['title' => 'Booking availability'], 'admin');
+}
+
+function admin_data_tools(): void
+{
+    if (($_GET['action'] ?? '') === 'export') {
+        try {
+            $type = (string) ($_GET['type'] ?? '');
+            data_transfer_definition($type);
+            audit('export:' . $type, 'data_transfer', null);
+            export_data_csv($type);
+        } catch (RuntimeException $exception) {
+            flash('error', $exception->getMessage());
+            redirect('/admin/data-tools');
+        }
+    }
+    if (is_post()) {
+        verify_csrf();
+        $type = (string) ($_POST['type'] ?? '');
+        try {
+            $count = import_data_csv($type, $_FILES['csv_file'] ?? null);
+            audit('import:' . $type . ':' . $count, 'data_transfer', null);
+            flash('success', $count . ' row' . ($count === 1 ? '' : 's') . ' imported successfully.');
+        } catch (Throwable $exception) {
+            flash('error', 'Import failed: ' . $exception->getMessage());
+        }
+        redirect('/admin/data-tools');
+    }
+    $datasets = array_filter(
+        data_transfer_catalog(),
+        static fn (array $definition): bool => can($definition['permission'])
+    );
+    render('admin/data-tools', compact('datasets') + ['title' => 'Import and export'], 'admin');
 }
 
 function send_appointment_admin_update(int $appointmentId): bool
@@ -1019,14 +1170,14 @@ function admin_grant_document(int $id): void
     $document = query_one('SELECT * FROM grant_application_documents WHERE id = ? LIMIT 1', [$id]);
     if (!$document) {
         http_response_code(404);
-        render('errors/404', ['title' => 'Document not found'], 'admin');
+        render('errors/404', ['title' => 'Document not found', 'adminError' => true], 'admin');
         return;
     }
     try {
         $path = GrantDocumentUploader::absolutePath((string) $document['storage_path']);
     } catch (RuntimeException) {
         http_response_code(404);
-        render('errors/404', ['title' => 'Document not found'], 'admin');
+        render('errors/404', ['title' => 'Document not found', 'adminError' => true], 'admin');
         return;
     }
     audit('view_document:' . $id, 'grant_application', (int) $document['application_id']);

@@ -77,6 +77,12 @@ if [ "${DB_BOOTSTRAP:-true}" = "true" ]; then
     echo "Making static page images editable."
     run_sql_file /var/www/html/database/migrations/20260801_editable_page_media.sql
   fi
+
+  availability_migration_count="$(mysql_command --batch --skip-column-names --execute="SELECT COUNT(*) FROM site_settings WHERE \`key\` = 'availability_maintenance_migration' AND \`value\` = '1'")"
+  if [ "${availability_migration_count}" = "0" ]; then
+    echo "Adding appointment availability and maintenance controls."
+    run_sql_file /var/www/html/database/migrations/20260801_availability_maintenance.sql
+  fi
 fi
 
 exec "$@"

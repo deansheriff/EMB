@@ -232,12 +232,34 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   INDEX idx_contact_inbox (is_archived, is_read, created_at)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS appointment_availability_slots (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  weekday TINYINT UNSIGNED NOT NULL COMMENT 'ISO-8601 weekday: 1=Monday, 7=Sunday',
+  start_time TIME NOT NULL,
+  duration_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 60,
+  capacity SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_availability_weekday_time (weekday, start_time),
+  INDEX idx_availability_active (is_active, weekday, start_time)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS appointment_blocked_dates (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  blocked_date DATE NOT NULL UNIQUE,
+  reason VARCHAR(255) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_blocked_date (blocked_date)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS appointments (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   booking_code VARCHAR(48) NOT NULL UNIQUE,
   consultation_type VARCHAR(190) NOT NULL,
   preferred_date DATE NULL,
   preferred_time TIME NULL,
+  availability_slot_id BIGINT UNSIGNED NULL,
   name VARCHAR(190) NOT NULL,
   email VARCHAR(190) NOT NULL,
   phone VARCHAR(80) NOT NULL,
@@ -256,7 +278,10 @@ CREATE TABLE IF NOT EXISTS appointments (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_appointments_status (status, created_at),
-  INDEX idx_appointments_payment (payment_status, created_at)
+  INDEX idx_appointments_payment (payment_status, created_at),
+  INDEX idx_appointments_availability (availability_slot_id, preferred_date, preferred_time),
+  INDEX idx_appointments_booking_date (preferred_date, status, availability_slot_id),
+  CONSTRAINT fk_appointment_availability_slot FOREIGN KEY (availability_slot_id) REFERENCES appointment_availability_slots(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS appointment_payments (

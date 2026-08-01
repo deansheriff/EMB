@@ -22,6 +22,7 @@ Approved design source: [EMB Chronicles on Google Stitch](https://stitch.withgoo
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260731_rbac.sql"
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260731_grant_forms.sql"
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260801_editable_page_media.sql"
+   C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260801_availability_maintenance.sql"
    ```
 
 3. Install PHP and frontend dependencies, then build the stylesheet:
@@ -133,6 +134,18 @@ https://your-production-domain.example/payments/paystack/webhook
 The application initializes checkout on the server, redirects clients to Paystack’s hosted checkout, verifies callbacks, validates webhook signatures, checks the exact amount and currency, and records every payment attempt. Appointments can be filtered and managed under **Admin → Appointments**.
 
 Use HTTPS and test keys until the callback, webhook, payment status, and confirmation email all work on the production domain.
+
+## Appointment availability
+
+Open **Admin → Availability** to enable or pause online booking, set the future booking window, minimum notice, daily booking limit, recurring weekly time slots, per-slot capacity, and blocked dates. The public appointment form shows only configured times for the selected weekday. The server rechecks blocked dates and capacity inside a database transaction before accepting a request, so concurrent requests cannot exceed a slot limit.
+
+## CSV import and export
+
+Open **Admin → Import / export** to transfer services, events, testimonials, newsletter subscribers, and grant applications. Available datasets follow the administrator's existing permissions. Export a fresh CSV before editing so the required headers stay intact. Imports are limited to 5 MB, update matching records, and roll back completely if any row is invalid. Grant exports exclude protected application documents.
+
+## Maintenance and deployment messaging
+
+Open **Admin → Site settings → Maintenance and deployment status** to configure the public status message or enable maintenance mode with an optional expected return time and external status-page link. Maintenance mode returns HTTP 503 while keeping administrator access, `/health`, and Paystack callbacks available. The custom 404 page provides navigation and displays the configured website status.
 
 ## Coolify deployment
 

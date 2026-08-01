@@ -1,6 +1,7 @@
 <header class="admin-page-header">
     <div><p class="text-sm text-muted">Booking, payment, and scheduling</p><h1>Appointments</h1></div>
-    <nav class="flex flex-wrap gap-2" aria-label="Payment filters">
+    <nav class="flex flex-wrap gap-2" aria-label="Appointment tools">
+        <a class="button button-secondary" href="<?= e(url('/admin/availability')) ?>">Manage availability</a>
         <?php foreach (['all'=>'All','paid'=>'Paid','pending'=>'Pending payment','failed'=>'Failed','not_required'=>'No payment'] as $value => $label): ?>
             <a class="button <?= $paymentFilter === $value ? 'button-primary' : 'button-secondary' ?>" href="<?= e(url('/admin/appointments?payment=' . $value)) ?>"><?= e($label) ?></a>
         <?php endforeach; ?>

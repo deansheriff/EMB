@@ -234,6 +234,69 @@
     button.textContent = input.type === "password" ? "Show" : "Hide";
   }));
 
+  const appointmentAvailability = qs("[data-appointment-availability]");
+  if (appointmentAvailability) {
+    const dateInput = qs('[name="preferred_date"]', appointmentAvailability);
+    const slotSelect = qs('[name="availability_slot_id"]', appointmentAvailability);
+    const message = qs("[data-availability-message]", appointmentAvailability);
+    let slots = [];
+    let blockedDates = [];
+    let bookings = {};
+    try { slots = JSON.parse(appointmentAvailability.dataset.slots || "[]"); } catch (_) {}
+    try { blockedDates = JSON.parse(appointmentAvailability.dataset.blockedDates || "[]"); } catch (_) {}
+    try { bookings = JSON.parse(appointmentAvailability.dataset.bookings || "{}"); } catch (_) {}
+    const dailyLimit = Number(appointmentAvailability.dataset.dailyLimit || 1);
+    const minimumTime = new Date(appointmentAvailability.dataset.minimumTimestamp || Date.now());
+    const oldSlot = String(appointmentAvailability.dataset.oldSlot || "");
+
+    const formatSlotTime = (time) => {
+      const [hour, minute] = String(time).split(":").map(Number);
+      return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" })
+        .format(new Date(2000, 0, 1, hour, minute));
+    };
+    const updateSlots = () => {
+      const selectedDate = dateInput?.value || "";
+      slotSelect.replaceChildren();
+      if (!selectedDate) {
+        slotSelect.append(new Option("Choose a date first", ""));
+        slotSelect.disabled = true;
+        if (message) message.textContent = "Select a date to view its available time slots.";
+        return;
+      }
+      if (blockedDates.includes(selectedDate)) {
+        slotSelect.append(new Option("Date unavailable", ""));
+        slotSelect.disabled = true;
+        if (message) message.textContent = "This date is blocked. Please choose another date.";
+        return;
+      }
+      const selectedDay = new Date(`${selectedDate}T12:00:00`).getDay() || 7;
+      const booked = bookings[selectedDate] || { total: 0, slots: {} };
+      const dayIsFull = Number(booked.total || 0) >= dailyLimit;
+      const available = slots.filter((slot) => {
+        const slotTime = new Date(`${selectedDate}T${slot.start_time}`);
+        const slotBookings = Number(booked.slots?.[String(slot.id)] || 0);
+        return !dayIsFull
+          && Number(slot.weekday) === selectedDay
+          && slotTime >= minimumTime
+          && slotBookings < Number(slot.capacity);
+      });
+      slotSelect.append(new Option(available.length ? "Choose a time" : "No times available", ""));
+      available.forEach((slot) => {
+        const option = new Option(`${formatSlotTime(slot.start_time)} · ${slot.duration_minutes} minutes`, String(slot.id));
+        if (String(slot.id) === oldSlot) option.selected = true;
+        slotSelect.append(option);
+      });
+      slotSelect.disabled = available.length === 0;
+      if (message) message.textContent = available.length
+        ? `${available.length} time slot${available.length === 1 ? "" : "s"} available.`
+        : dayIsFull
+          ? "This date has reached its booking limit. Please choose another date."
+          : "No times are available on this date.";
+    };
+    dateInput?.addEventListener("change", updateSlots);
+    updateSlots();
+  }
+
   document.addEventListener("click", (event) => {
     const trigger = event.target.closest("[data-confirm]");
     if (trigger && !window.confirm(trigger.dataset.confirm)) event.preventDefault();

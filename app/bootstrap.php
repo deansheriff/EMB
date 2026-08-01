@@ -13,6 +13,7 @@ require_once __DIR__ . '/MediaUploader.php';
 require_once __DIR__ . '/GrantDocumentUploader.php';
 require_once __DIR__ . '/Mailer.php';
 require_once __DIR__ . '/PaystackClient.php';
+require_once __DIR__ . '/DataTransfer.php';
 require_once __DIR__ . '/PublicController.php';
 require_once __DIR__ . '/AdminController.php';
 

@@ -69,6 +69,18 @@
                     </div>
                 </div>
             </section>
+            <section class="admin-card">
+                <div class="admin-card-header"><h2>Maintenance and deployment status</h2><span class="text-xs text-muted">Public operational messaging</span></div>
+                <div class="mt-6 space-y-5">
+                    <label class="consent-row"><input type="checkbox" name="maintenance_enabled" value="1" <?= ($settings['maintenance_enabled'] ?? '0') === '1' ? 'checked' : '' ?>><span>Enable maintenance mode for public pages</span></label>
+                    <div class="rounded-xl border border-amber/25 bg-[#FFF7EB] p-4 text-xs leading-5 text-muted">Administrators, the health check, and Paystack callbacks remain available. Public pages return HTTP 503 while maintenance mode is active.</div>
+                    <div class="form-field"><label>Maintenance heading</label><input class="form-control" name="maintenance_title" value="<?= e($settings['maintenance_title'] ?? 'We are making the website better') ?>"></div>
+                    <div class="form-field"><label>Maintenance message</label><textarea class="form-control" name="maintenance_message" rows="4"><?= e($settings['maintenance_message'] ?? '') ?></textarea></div>
+                    <div class="form-field"><label>Expected return time <span class="text-muted">(optional)</span></label><input class="form-control" type="datetime-local" name="maintenance_end_at" value="<?= e(!empty($settings['maintenance_end_at']) ? date('Y-m-d\TH:i', strtotime($settings['maintenance_end_at'])) : '') ?>"></div>
+                    <div class="form-field"><label>Deployment status message</label><input class="form-control" name="deployment_status_message" value="<?= e($settings['deployment_status_message'] ?? 'All website services are operational.') ?>"><p class="field-help">Shown on maintenance and page-not-found screens.</p></div>
+                    <div class="form-field"><label>External status page URL <span class="text-muted">(optional)</span></label><input class="form-control" type="url" name="deployment_status_url" value="<?= e($settings['deployment_status_url'] ?? '') ?>" placeholder="https://status.example.com"></div>
+                </div>
+            </section>
         </div>
         <aside class="admin-card self-start xl:sticky xl:top-24"><div class="admin-card-header"><h2>Live brand preview</h2></div><div class="mt-6 overflow-hidden rounded-2xl border border-line"><div class="flex items-center gap-3 bg-white p-5"><span class="grid size-10 place-items-center rounded-full bg-wine text-sm font-bold text-white">EC</span><div><p class="font-display text-lg text-wine"><?= e($settings['site_name'] ?? '') ?></p><p class="text-[9px] font-bold uppercase tracking-[.16em] text-muted"><?= e($settings['tagline'] ?? '') ?></p></div></div><div class="bg-wine p-6 text-white"><p class="font-display text-2xl"><?= e($settings['site_name'] ?? '') ?></p><p class="mt-3 text-xs leading-5 text-white/65"><?= e($settings['footer_blurb'] ?? '') ?></p></div></div><button class="button button-primary mt-6 w-full">Save all settings</button><p class="mt-3 text-center text-xs text-muted">Unsaved changes are not shown on the public site.</p></aside>
     </div>

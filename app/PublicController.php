@@ -13,6 +13,20 @@ function public_dispatch(string $path): void
         return;
     }
 
+    if ((string) setting('maintenance_enabled', '0') === '1' && $path !== '/payments/paystack/callback') {
+        http_response_code(503);
+        header('Retry-After: 3600');
+        header('Cache-Control: no-store, max-age=0');
+        render('errors/maintenance', [
+            'title' => (string) setting('maintenance_title', 'Website maintenance'),
+            'maintenanceMessage' => (string) setting('maintenance_message', 'The public website is temporarily unavailable while an update is completed.'),
+            'maintenanceEndAt' => (string) setting('maintenance_end_at', ''),
+            'statusMessage' => (string) setting('deployment_status_message', 'An update is currently in progress.'),
+            'statusUrl' => (string) setting('deployment_status_url', ''),
+        ]);
+        return;
+    }
+
     if (is_post()) {
         if ($path === '/contact') {
             submit_contact();
@@ -99,12 +113,14 @@ function public_dispatch(string $path): void
 
         case '/appointment':
             $fee = money_to_subunit((string) setting('appointment_fee', '0'));
+            $availability = appointment_availability_context();
             render('public/appointment', [
                 'title' => 'Book a Session',
                 'description' => 'Book a fertility education, clinic guidance, IVF clarity, or STEM career consultation.',
                 'paymentRequired' => PaystackClient::configured(),
                 'appointmentFee' => $fee,
                 'currency' => strtoupper((string) setting('paystack_currency', 'NGN')),
+                'availability' => $availability,
             ]);
             clear_old();
             return;
@@ -267,6 +283,46 @@ function submit_contact(): void
     redirect('/contact?sent=1');
 }
 
+function appointment_availability_context(): array
+{
+    $noticeHours = max(0, (int) setting('appointment_min_notice_hours', 24));
+    $windowDays = max(1, (int) setting('appointment_booking_window_days', 60));
+    $dailyLimit = max(1, (int) setting('appointment_daily_limit', 6));
+    $now = new DateTimeImmutable('now');
+    $minDate = $now->modify('+' . $noticeHours . ' hours')->format('Y-m-d');
+    $maxDate = $now->modify('+' . $windowDays . ' days')->format('Y-m-d');
+    $bookings = [];
+    $bookedRows = query_all(
+        "SELECT preferred_date, availability_slot_id, COUNT(*) AS booking_count
+         FROM appointments
+         WHERE preferred_date BETWEEN ? AND ?
+           AND availability_slot_id IS NOT NULL
+           AND status <> 'cancelled'
+         GROUP BY preferred_date, availability_slot_id",
+        [$minDate, $maxDate]
+    );
+    foreach ($bookedRows as $row) {
+        $bookedDate = (string) $row['preferred_date'];
+        $slotId = (string) $row['availability_slot_id'];
+        $count = (int) $row['booking_count'];
+        $bookings[$bookedDate] ??= ['total' => 0, 'slots' => []];
+        $bookings[$bookedDate]['total'] += $count;
+        $bookings[$bookedDate]['slots'][$slotId] = $count;
+    }
+    return [
+        'enabled' => (string) setting('appointment_booking_enabled', '1') === '1',
+        'notice_hours' => $noticeHours,
+        'window_days' => $windowDays,
+        'daily_limit' => $dailyLimit,
+        'min_date' => $minDate,
+        'max_date' => $maxDate,
+        'minimum_timestamp' => $now->modify('+' . $noticeHours . ' hours')->format(DateTimeInterface::ATOM),
+        'slots' => query_all('SELECT id, weekday, start_time, duration_minutes, capacity FROM appointment_availability_slots WHERE is_active = 1 ORDER BY weekday, start_time'),
+        'blocked_dates' => array_column(query_all('SELECT blocked_date FROM appointment_blocked_dates WHERE blocked_date >= CURRENT_DATE ORDER BY blocked_date'), 'blocked_date'),
+        'bookings' => $bookings,
+    ];
+}
+
 function submit_appointment(): void
 {
     verify_csrf();
@@ -279,7 +335,11 @@ function submit_appointment(): void
     }
     store_old($_POST);
     $email = strtolower(trim((string) ($_POST['email'] ?? '')));
-    $required = ['consultation_type', 'name', 'phone', 'preferred_contact'];
+    if ((string) setting('appointment_booking_enabled', '1') !== '1') {
+        flash('error', 'Online appointment booking is temporarily paused. Please contact the team for help.');
+        redirect('/appointment');
+    }
+    $required = ['consultation_type', 'preferred_date', 'availability_slot_id', 'name', 'phone', 'preferred_contact'];
     foreach ($required as $field) {
         if (trim((string) ($_POST[$field] ?? '')) === '') {
             flash('error', 'Please complete all required fields.');
@@ -290,6 +350,12 @@ function submit_appointment(): void
         flash('error', 'Please provide a valid email and confirm consent.');
         redirect('/appointment');
     }
+    $preferredDate = trim((string) $_POST['preferred_date']);
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $preferredDate);
+    if (!$date || $date->format('Y-m-d') !== $preferredDate) {
+        flash('error', 'Choose a valid appointment date.');
+        redirect('/appointment');
+    }
     $bookingCode = new_booking_code();
     $currency = strtoupper((string) setting('paystack_currency', 'NGN'));
     $amount = PaystackClient::configured() ? money_to_subunit((string) setting('appointment_fee', '0')) : 0;
@@ -297,27 +363,81 @@ function submit_appointment(): void
     $status = $requiresPayment ? 'pending_payment' : 'new';
     $paymentStatus = $requiresPayment ? 'pending' : 'not_required';
 
-    $stmt = db()->prepare(
-        'INSERT INTO appointments
-         (booking_code, consultation_type, preferred_date, preferred_time, name, email, phone, preferred_contact, message, status, amount_due, currency, payment_status, consented_at)
-         VALUES (?, ?, NULLIF(?, ""), NULLIF(?, ""), ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
-    );
-    $stmt->execute([
-        $bookingCode,
-        trim((string) $_POST['consultation_type']),
-        trim((string) ($_POST['preferred_date'] ?? '')),
-        trim((string) ($_POST['preferred_time'] ?? '')),
-        trim((string) $_POST['name']),
-        $email,
-        trim((string) $_POST['phone']),
-        trim((string) $_POST['preferred_contact']),
-        trim((string) ($_POST['message'] ?? '')),
-        $status,
-        $amount,
-        $currency,
-        $paymentStatus,
-    ]);
-    $appointmentId = (int) db()->lastInsertId();
+    $slotId = (int) $_POST['availability_slot_id'];
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        // Lock the weekday's slots together so concurrent requests on different
+        // times cannot race past the per-day booking limit.
+        $weekday = (int) $date->format('N');
+        $slotStmt = $pdo->prepare('SELECT * FROM appointment_availability_slots WHERE weekday = ? AND is_active = 1 ORDER BY start_time FOR UPDATE');
+        $slotStmt->execute([$weekday]);
+        $slot = null;
+        foreach ($slotStmt->fetchAll() as $candidate) {
+            if ((int) $candidate['id'] === $slotId) {
+                $slot = $candidate;
+                break;
+            }
+        }
+        if (!$slot) {
+            throw new RuntimeException('That time slot is not available on the selected date.');
+        }
+        $blockedStmt = $pdo->prepare('SELECT COUNT(*) FROM appointment_blocked_dates WHERE blocked_date = ?');
+        $blockedStmt->execute([$preferredDate]);
+        if ((int) $blockedStmt->fetchColumn() > 0) {
+            throw new RuntimeException('The selected date is unavailable. Please choose another date.');
+        }
+        $appointmentTime = new DateTimeImmutable($preferredDate . ' ' . $slot['start_time']);
+        $minimumTime = (new DateTimeImmutable('now'))->modify('+' . max(0, (int) setting('appointment_min_notice_hours', 24)) . ' hours');
+        $maximumDate = (new DateTimeImmutable('today'))->modify('+' . max(1, (int) setting('appointment_booking_window_days', 60)) . ' days');
+        if ($appointmentTime < $minimumTime || $date > $maximumDate) {
+            throw new RuntimeException('Choose a time within the available booking window.');
+        }
+        $countStmt = $pdo->prepare(
+            "SELECT
+                SUM(CASE WHEN availability_slot_id = ? THEN 1 ELSE 0 END) AS slot_count,
+                COUNT(*) AS day_count
+             FROM appointments
+             WHERE preferred_date = ? AND status <> 'cancelled'"
+        );
+        $countStmt->execute([$slotId, $preferredDate]);
+        $counts = $countStmt->fetch() ?: ['slot_count' => 0, 'day_count' => 0];
+        if ((int) $counts['slot_count'] >= (int) $slot['capacity']) {
+            throw new RuntimeException('That time has just filled up. Please choose another slot.');
+        }
+        if ((int) $counts['day_count'] >= max(1, (int) setting('appointment_daily_limit', 6))) {
+            throw new RuntimeException('The selected date has reached its booking limit. Please choose another date.');
+        }
+        $stmt = $pdo->prepare(
+            'INSERT INTO appointments
+             (booking_code, consultation_type, preferred_date, preferred_time, availability_slot_id, name, email, phone, preferred_contact, message, status, amount_due, currency, payment_status, consented_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+        );
+        $stmt->execute([
+            $bookingCode,
+            trim((string) $_POST['consultation_type']),
+            $preferredDate,
+            $slot['start_time'],
+            $slotId,
+            trim((string) $_POST['name']),
+            $email,
+            trim((string) $_POST['phone']),
+            trim((string) $_POST['preferred_contact']),
+            trim((string) ($_POST['message'] ?? '')),
+            $status,
+            $amount,
+            $currency,
+            $paymentStatus,
+        ]);
+        $appointmentId = (int) $pdo->lastInsertId();
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        flash('error', $exception instanceof RuntimeException ? $exception->getMessage() : 'The selected booking could not be reserved. Please try again.');
+        redirect('/appointment');
+    }
     clear_old();
 
     if ($requiresPayment) {
@@ -1055,5 +1175,9 @@ function public_sitemap(): void
 function public_not_found(): void
 {
     http_response_code(404);
-    render('errors/404', ['title' => 'Page not found']);
+    render('errors/404', [
+        'title' => 'Page not found',
+        'statusMessage' => (string) setting('deployment_status_message', 'All website services are operational.'),
+        'statusUrl' => (string) setting('deployment_status_url', ''),
+    ]);
 }

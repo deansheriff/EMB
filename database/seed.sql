@@ -63,6 +63,16 @@ INSERT INTO site_settings (`key`, `value`, `type`) VALUES
 ('default_meta_description', 'Clear, compassionate fertility education, consultation, community support, and STEM career mentorship.', 'textarea'),
 ('social_share_image', '', 'image'),
 ('social_share_image_alt', '', 'text'),
+('appointment_booking_enabled', '1', 'boolean'),
+('appointment_booking_window_days', '60', 'number'),
+('appointment_min_notice_hours', '24', 'number'),
+('appointment_daily_limit', '6', 'number'),
+('maintenance_enabled', '0', 'boolean'),
+('maintenance_title', 'We are making the website better', 'text'),
+('maintenance_message', 'The public website is temporarily unavailable while an update is completed. Please check back shortly.', 'textarea'),
+('maintenance_end_at', '', 'datetime'),
+('deployment_status_message', 'All website services are operational.', 'text'),
+('deployment_status_url', '', 'url'),
 ('smtp_enabled', '0', 'boolean'),
 ('smtp_host', '', 'text'),
 ('smtp_port', '587', 'number'),
@@ -84,12 +94,22 @@ ON DUPLICATE KEY UPDATE
   site_settings.`key` IN (
     'smtp_enabled','smtp_host','smtp_port','smtp_encryption','smtp_username','smtp_password',
     'smtp_from_email','smtp_from_name','smtp_reply_to','smtp_admin_email','email_confirmations_enabled',
-    'paystack_enabled','paystack_public_key','paystack_secret_key','paystack_currency','appointment_fee'
+    'paystack_enabled','paystack_public_key','paystack_secret_key','paystack_currency','appointment_fee',
+    'appointment_booking_enabled','appointment_booking_window_days','appointment_min_notice_hours','appointment_daily_limit',
+    'maintenance_enabled','maintenance_title','maintenance_message','maintenance_end_at','deployment_status_message','deployment_status_url'
   ),
   site_settings.`value`,
   VALUES(`value`)
 ),
 `type` = VALUES(`type`);
+
+INSERT INTO appointment_availability_slots (weekday, start_time, duration_minutes, capacity, is_active) VALUES
+(1, '10:00:00', 60, 1, 1), (1, '12:00:00', 60, 1, 1), (1, '14:00:00', 60, 1, 1),
+(2, '10:00:00', 60, 1, 1), (2, '12:00:00', 60, 1, 1), (2, '14:00:00', 60, 1, 1),
+(3, '10:00:00', 60, 1, 1), (3, '12:00:00', 60, 1, 1), (3, '14:00:00', 60, 1, 1),
+(4, '10:00:00', 60, 1, 1), (4, '12:00:00', 60, 1, 1), (4, '14:00:00', 60, 1, 1),
+(5, '10:00:00', 60, 1, 1), (5, '12:00:00', 60, 1, 1), (5, '14:00:00', 60, 1, 1)
+ON DUPLICATE KEY UPDATE weekday = VALUES(weekday);
 
 INSERT INTO hero_slides
 (image_path, image_alt, headline, subheading, cta_label, cta_link, secondary_label, secondary_link, sort_order, is_active)

@@ -12,7 +12,9 @@ $nav = [
     '/admin/grant-applications' => ['Grant applications', 'grant', 'grants.manage'],
     '/admin/contact-submissions' => ['Contact submissions', 'mail', 'contacts.manage'],
     '/admin/appointments' => ['Appointments', 'clock', 'appointments.manage'],
+    '/admin/availability' => ['Availability', 'calendar', 'appointments.manage'],
     '/admin/email-log' => ['Email log', 'mail', 'email_log.view'],
+    '/admin/data-tools' => ['Import / export', 'file', ['services.manage', 'events.manage', 'testimonials.manage', 'contacts.manage', 'grants.manage']],
     '/admin/settings' => ['Site settings', 'settings', 'settings.manage'],
     '/admin/users' => ['Administrators', 'users', 'users.manage'],
     '/admin/roles' => ['Roles & access', 'lock', 'roles.manage'],
@@ -41,7 +43,7 @@ $nav = [
             </div>
             <nav class="space-y-1">
                 <?php foreach ($nav as $href => [$label, $icon, $permission]): ?>
-                    <?php if (!can($permission)) continue; ?>
+                    <?php if (is_array($permission) ? !can_any($permission) : !can($permission)) continue; ?>
                     <?php $active = $href === '/admin' ? in_array($adminPath, ['/admin', '/admin/dashboard'], true) : str_starts_with($adminPath, $href); ?>
                     <a href="<?= e(url($href)) ?>" class="admin-nav-link <?= $active ? 'is-active' : '' ?>">
                         <span aria-hidden="true"><?= e(match ($icon) {
