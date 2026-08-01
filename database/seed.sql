@@ -61,6 +61,8 @@ INSERT INTO site_settings (`key`, `value`, `type`) VALUES
 ('logo_path', '', 'image'),
 ('default_meta_title', 'Emb Chronicles — Fertility Education', 'text'),
 ('default_meta_description', 'Clear, compassionate fertility education, consultation, community support, and STEM career mentorship.', 'textarea'),
+('social_share_image', '', 'image'),
+('social_share_image_alt', '', 'text'),
 ('smtp_enabled', '0', 'boolean'),
 ('smtp_host', '', 'text'),
 ('smtp_port', '587', 'number'),

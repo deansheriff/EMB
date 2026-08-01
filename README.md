@@ -64,9 +64,11 @@ Every public-facing image can be replaced or removed from the admin panel:
 - **Services** manages service covers and gallery images.
 - **Events** manages event and grant covers and gallery images.
 - **Testimonials** manages client photos.
-- **Site settings** manages the header logo.
+- **Site settings** manages the header logo and default social sharing image.
 
 Image fields accept a JPG, PNG, or WebP upload, a local `/uploads/...` path, or a full external URL. Add descriptive alt text whenever an image is present. Removing an image also removes its alt text; removing a hero image deactivates that slide.
+
+Under **Admin → Site settings → Search and social sharing**, set the homepage meta title, meta description, and default link-preview image. The site emits Open Graph and Twitter Card metadata automatically. Individual service and event pages use their own SEO descriptions and cover images, falling back to these global settings when no cover is present.
 
 ## Roles and administrator access
 

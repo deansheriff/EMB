@@ -478,6 +478,7 @@ function admin_settings(): void
         'site_name', 'tagline', 'phone', 'whatsapp', 'email', 'address', 'opening_hours',
         'instagram', 'tiktok', 'footer_blurb', 'stats_members', 'stats_families',
         'logo_path', 'default_meta_title', 'default_meta_description',
+        'social_share_image', 'social_share_image_alt',
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_from_email',
         'smtp_from_name', 'smtp_reply_to', 'smtp_admin_email',
         'paystack_public_key', 'paystack_currency', 'appointment_fee',
@@ -496,6 +497,32 @@ function admin_settings(): void
                 flash('error', $exception->getMessage());
                 redirect('/admin/settings');
             }
+        }
+        if (!empty($_POST['remove_social_share_image'])) {
+            $_POST['social_share_image'] = '';
+            $_POST['social_share_image_alt'] = '';
+        } elseif (!empty($_FILES['social_share_image_file']['name'])) {
+            $socialImageAlt = trim((string) ($_POST['social_share_image_alt'] ?? ''));
+            if ($socialImageAlt === '') {
+                flash('error', 'Add descriptive alt text before uploading the social sharing image.');
+                redirect('/admin/settings');
+            }
+            try {
+                $media = MediaUploader::store($_FILES['social_share_image_file'], $socialImageAlt);
+                $_POST['social_share_image'] = $media['variants']['original'] ?? $media['path'];
+            } catch (RuntimeException $exception) {
+                flash('error', $exception->getMessage());
+                redirect('/admin/settings');
+            }
+        }
+        $socialImage = trim((string) ($_POST['social_share_image'] ?? ''));
+        $socialImageAlt = trim((string) ($_POST['social_share_image_alt'] ?? ''));
+        if ($socialImage !== '' && $socialImageAlt === '') {
+            flash('error', 'Add descriptive alt text when a social sharing image is used.');
+            redirect('/admin/settings');
+        }
+        if ($socialImage === '') {
+            $_POST['social_share_image_alt'] = '';
         }
         $fee = trim((string) ($_POST['appointment_fee'] ?? '0'));
         if (!preg_match('/^\d+(?:\.\d{1,2})?$/', str_replace([',', ' '], '', $fee))) {
@@ -545,6 +572,8 @@ function admin_settings(): void
                     in_array($key, ['stats_members', 'stats_families', 'smtp_port'], true) => 'number',
                     $key === 'appointment_fee' => 'money',
                     in_array($key, ['smtp_from_email', 'smtp_reply_to', 'smtp_admin_email'], true) => 'email',
+                    in_array($key, ['logo_path', 'social_share_image'], true) => 'image',
+                    in_array($key, ['default_meta_description', 'footer_blurb'], true) => 'textarea',
                     default => 'text',
                 };
                 $stmt->execute([$key, trim((string) $_POST[$key]), $type]);

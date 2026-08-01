@@ -47,7 +47,7 @@ function public_dispatch(string $path): void
             $services = query_all("SELECT * FROM services WHERE status = 'published' ORDER BY is_pinned DESC, sort_order, created_at DESC LIMIT 3");
             $testimonials = query_all('SELECT * FROM testimonials WHERE is_visible = 1 ORDER BY sort_order, id');
             render('public/home', compact('heroes', 'events', 'services', 'testimonials') + [
-                'title' => 'Fertility education with clarity and compassion',
+                'title' => (string) setting('default_meta_title', 'Emb Chronicles — Fertility Education'),
                 'description' => (string) setting('default_meta_description'),
                 'bodyClass' => 'home-page',
             ]);
@@ -136,6 +136,7 @@ function public_dispatch(string $path): void
             'title' => $service['seo_title'] ?: $service['title'],
             'description' => $service['seo_description'] ?: $service['excerpt'],
             'ogImage' => $service['cover_image'],
+            'ogImageAlt' => $service['cover_alt'],
         ]);
         return;
     }
@@ -155,6 +156,7 @@ function public_dispatch(string $path): void
             'title' => $event['seo_title'] ?: $event['title'],
             'description' => $event['seo_description'] ?: $event['excerpt'],
             'ogImage' => $event['cover_image'],
+            'ogImageAlt' => $event['cover_alt'],
         ]);
         return;
     }
