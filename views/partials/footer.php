@@ -47,7 +47,7 @@
     </div>
 </footer>
 <section class="support-chat" data-support-chat data-whatsapp-url="<?= e(setting('whatsapp')) ?>">
-    <div id="support-chat-panel" class="support-chat-panel" role="dialog" aria-labelledby="support-chat-title" hidden data-chat-panel>
+    <div id="support-chat-panel" class="support-chat-panel" role="dialog" aria-labelledby="support-chat-title" aria-hidden="true" hidden inert style="display:none" data-chat-panel>
         <header class="support-chat-header">
             <span class="support-chat-avatar" aria-hidden="true">EC</span>
             <div class="min-w-0">

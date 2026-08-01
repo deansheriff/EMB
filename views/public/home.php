@@ -1,7 +1,7 @@
 <section class="hero-shell" data-hero>
     <?php if ($heroes): ?>
         <?php foreach ($heroes as $index => $hero): ?>
-            <article class="hero-slide <?= $index === 0 ? 'is-active' : '' ?>" data-hero-slide aria-hidden="<?= $index === 0 ? 'false' : 'true' ?>">
+            <article class="hero-slide <?= $index === 0 ? 'is-active' : '' ?>" data-hero-slide aria-hidden="<?= $index === 0 ? 'false' : 'true' ?>"<?= $index === 0 ? '' : ' inert' ?>>
                 <div class="mx-auto grid min-h-[650px] max-w-content items-center gap-10 px-5 py-16 lg:grid-cols-[.88fr_1.12fr] lg:px-6 lg:py-20">
                     <div class="relative z-10 max-w-2xl">
                         <p class="eyebrow">Fertility education & advocacy</p>
@@ -155,7 +155,7 @@
             </div>
             <div class="testimonial-stage">
                 <?php foreach ($testimonials as $index => $testimonial): ?>
-                    <figure class="testimonial <?= $index === 0 ? 'is-active' : '' ?>" data-testimonial aria-hidden="<?= $index === 0 ? 'false' : 'true' ?>">
+                    <figure class="testimonial <?= $index === 0 ? 'is-active' : '' ?>" data-testimonial aria-hidden="<?= $index === 0 ? 'false' : 'true' ?>"<?= $index === 0 ? '' : ' inert' ?>>
                         <blockquote>“<?= e($testimonial['quote']) ?>”</blockquote>
                         <figcaption class="mt-7 flex items-center gap-4">
                             <?php if ($testimonial['photo_path']): ?><img src="<?= e(media_url($testimonial['photo_path'])) ?>" alt="<?= e($testimonial['photo_alt']) ?>" loading="lazy"><?php endif; ?>

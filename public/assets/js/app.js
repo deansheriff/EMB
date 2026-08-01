@@ -90,6 +90,7 @@
       slides.forEach((slide, i) => {
         slide.classList.toggle("is-active", i === index);
         slide.setAttribute("aria-hidden", String(i !== index));
+        slide.inert = i !== index;
       });
       if (status) status.textContent = `${index + 1} / ${slides.length}`;
     };
@@ -119,6 +120,7 @@
       items.forEach((item, i) => {
         item.classList.toggle("is-active", i === current);
         item.setAttribute("aria-hidden", String(i !== current));
+        item.inert = i !== current;
       });
     };
     qs("[data-testimonial-prev]", testimonials)?.addEventListener("click", () => show(current - 1));
@@ -192,7 +194,10 @@
       if (!panel) return;
       window.clearTimeout(hideTimer);
       lastFocused = trigger || document.activeElement;
+      panel.style.removeProperty("display");
       panel.hidden = false;
+      panel.inert = false;
+      panel.setAttribute("aria-hidden", "false");
       updateExpandedState(true);
       window.requestAnimationFrame(() => {
         panel.classList.add("is-open");
@@ -203,9 +208,14 @@
     const closeChat = (restoreFocus = false) => {
       if (!panel || panel.hidden) return;
       panel.classList.remove("is-open");
+      panel.inert = true;
+      panel.setAttribute("aria-hidden", "true");
       updateExpandedState(false);
       hideTimer = window.setTimeout(() => {
-        if (!panel.classList.contains("is-open")) panel.hidden = true;
+        if (!panel.classList.contains("is-open")) {
+          panel.hidden = true;
+          panel.style.display = "none";
+        }
       }, 200);
       if (restoreFocus && lastFocused instanceof HTMLElement) lastFocused.focus({ preventScroll: true });
     };

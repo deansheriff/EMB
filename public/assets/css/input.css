@@ -48,6 +48,7 @@
   .hero-shell { @apply relative grid overflow-hidden border-b border-line bg-white; touch-action: pan-y pinch-zoom; }
   .hero-slide { @apply pointer-events-none relative col-start-1 row-start-1 translate-x-8 opacity-0 transition duration-700; }
   .hero-slide.is-active { @apply pointer-events-auto translate-x-0 opacity-100; }
+  .hero-slide:not(.is-active), .hero-slide:not(.is-active) * { pointer-events: none !important; }
   .hero-media { @apply relative overflow-hidden rounded-[28px] shadow-soft; }
   .hero-media::after { content: ""; @apply pointer-events-none absolute inset-0 bg-gradient-to-t from-wine/20 to-transparent; }
   .hero-media img { @apply aspect-[4/5] min-h-[420px] w-full object-cover sm:aspect-[5/4] lg:aspect-[4/3]; }
@@ -67,6 +68,7 @@
   .testimonial-stage { @apply relative grid min-h-[350px] overflow-hidden; }
   .testimonial { @apply pointer-events-none relative col-start-1 row-start-1 translate-x-6 rounded-[28px] border border-line bg-white p-7 opacity-0 shadow-soft transition duration-500 sm:p-10; }
   .testimonial.is-active { @apply pointer-events-auto translate-x-0 opacity-100; }
+  .testimonial:not(.is-active), .testimonial:not(.is-active) * { pointer-events: none !important; }
   .testimonial blockquote { @apply font-display text-3xl leading-[1.35] text-wine sm:text-4xl; }
   .testimonial img { @apply size-14 rounded-full object-cover; }
   .step-number, .check { @apply grid size-8 shrink-0 place-items-center rounded-full bg-blush text-sm font-bold text-wine; }
