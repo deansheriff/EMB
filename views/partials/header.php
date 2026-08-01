@@ -18,14 +18,14 @@ $navItems = [
     </div>
 </div>
 <header class="site-header" data-header>
-    <div class="mx-auto flex max-w-content items-center gap-6 px-5 py-4 lg:px-6">
-        <a href="<?= e(url('/')) ?>" class="flex shrink-0 items-center gap-3" aria-label="Emb Chronicles home">
+    <div class="mx-auto flex max-w-content items-center gap-3 px-5 py-4 sm:gap-6 lg:px-6">
+        <a href="<?= e(url('/')) ?>" class="flex min-w-0 shrink-0 items-center gap-3" aria-label="Emb Chronicles home">
             <?php if ($logo): ?>
-                <img src="<?= e(media_url($logo)) ?>" alt="<?= e(setting('site_name')) ?>" class="h-11 w-auto">
+                <img src="<?= e(media_url($logo)) ?>" alt="<?= e(setting('site_name')) ?>" class="h-11 w-auto max-w-[150px] object-contain sm:max-w-[180px]">
             <?php else: ?>
                 <span class="grid size-11 place-items-center rounded-full bg-wine font-display text-xl text-white">EC</span>
             <?php endif; ?>
-            <span>
+            <span class="hidden min-w-0 sm:block">
                 <span class="block font-display text-xl font-semibold leading-none text-wine"><?= e(setting('site_name', 'Emb Chronicles')) ?></span>
                 <span class="mt-1 block text-[10px] font-bold uppercase tracking-[.19em] text-muted"><?= e(setting('tagline', 'Fertility Education')) ?></span>
             </span>
@@ -37,7 +37,7 @@ $navItems = [
             <?php endforeach; ?>
             <a href="<?= e(url('/appointment')) ?>" class="button button-primary lg:hidden">Book a session</a>
         </nav>
-        <div class="ml-auto flex items-center gap-2">
+        <div class="ml-auto flex shrink-0 items-center gap-2">
             <button type="button" class="icon-button text-sage" data-chat-open aria-controls="support-chat-panel" aria-expanded="false" aria-label="Open WhatsApp help">
                 <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M20.5 11.6a8.5 8.5 0 0 1-12.56 7.47L3.5 20.5l1.45-4.27A8.5 8.5 0 1 1 20.5 11.6Z"/>

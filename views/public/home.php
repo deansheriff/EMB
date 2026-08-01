@@ -13,7 +13,7 @@
                         </div>
                     </div>
                     <div class="hero-media">
-                        <img src="<?= e(media_url($hero['image_path'])) ?>" alt="<?= e($hero['image_alt']) ?>" fetchpriority="<?= $index === 0 ? 'high' : 'low' ?>">
+                        <img src="<?= e(media_url($hero['image_path'])) ?>" alt="<?= e($hero['image_alt']) ?>" fetchpriority="<?= $index === 0 ? 'high' : 'low' ?>" draggable="false">
                     </div>
                 </div>
             </article>

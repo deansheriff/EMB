@@ -59,7 +59,10 @@ function url(string $path = ''): string
 
 function asset(string $path): string
 {
-    return url('assets/' . ltrim($path, '/'));
+    $relative = 'assets/' . ltrim($path, '/');
+    $absolute = PUBLIC_PATH . '/' . $relative;
+    $version = is_file($absolute) ? '?v=' . filemtime($absolute) : '';
+    return url($relative) . $version;
 }
 
 function media_url(?string $path): string

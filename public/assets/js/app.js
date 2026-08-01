@@ -7,39 +7,67 @@
   const menuButton = qs("[data-menu-button]");
   const siteNav = qs("#site-nav");
   if (menuButton && siteNav) {
+    const closeSiteMenu = () => {
+      siteNav.classList.remove("is-open");
+      menuButton.setAttribute("aria-expanded", "false");
+      menuButton.setAttribute("aria-label", "Open navigation");
+      menuButton.textContent = "\u2630";
+    };
     menuButton.addEventListener("click", () => {
       const open = siteNav.classList.toggle("is-open");
       menuButton.setAttribute("aria-expanded", String(open));
       menuButton.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
       menuButton.textContent = open ? "×" : "☰";
-      document.body.classList.toggle("menu-open", open);
     });
     qsa("a", siteNav).forEach((link) => link.addEventListener("click", () => {
       siteNav.classList.remove("is-open");
       menuButton.setAttribute("aria-expanded", "false");
       menuButton.setAttribute("aria-label", "Open navigation");
       menuButton.textContent = "☰";
-      document.body.classList.remove("menu-open");
     }));
+    document.addEventListener("click", (event) => {
+      if (!siteNav.classList.contains("is-open") || siteNav.contains(event.target) || menuButton.contains(event.target)) return;
+      closeSiteMenu();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && siteNav.classList.contains("is-open")) closeSiteMenu();
+    });
+    window.addEventListener("resize", () => {
+      if (window.innerWidth >= 1024) closeSiteMenu();
+    }, { passive: true });
   }
 
   const adminButton = qs("[data-admin-menu]");
   const adminSidebar = qs("#admin-sidebar");
   if (adminButton && adminSidebar) {
+    const closeAdminMenu = () => {
+      adminSidebar.classList.remove("is-open");
+      adminButton.setAttribute("aria-expanded", "false");
+      adminButton.setAttribute("aria-label", "Open admin navigation");
+      adminButton.textContent = "\u2630";
+    };
     adminButton.addEventListener("click", () => {
       const open = adminSidebar.classList.toggle("is-open");
       adminButton.setAttribute("aria-expanded", String(open));
       adminButton.setAttribute("aria-label", open ? "Close admin navigation" : "Open admin navigation");
       adminButton.textContent = open ? "×" : "☰";
-      document.body.classList.toggle("menu-open", open);
     });
     qsa("a", adminSidebar).forEach((link) => link.addEventListener("click", () => {
       adminSidebar.classList.remove("is-open");
       adminButton.setAttribute("aria-expanded", "false");
       adminButton.setAttribute("aria-label", "Open admin navigation");
       adminButton.textContent = "☰";
-      document.body.classList.remove("menu-open");
     }));
+    document.addEventListener("click", (event) => {
+      if (!adminSidebar.classList.contains("is-open") || adminSidebar.contains(event.target) || adminButton.contains(event.target)) return;
+      closeAdminMenu();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && adminSidebar.classList.contains("is-open")) closeAdminMenu();
+    });
+    window.addEventListener("resize", () => {
+      if (window.innerWidth >= 1024) closeAdminMenu();
+    }, { passive: true });
   }
 
   const header = qs("[data-header]");
