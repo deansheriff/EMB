@@ -44,9 +44,35 @@ CREATE TABLE IF NOT EXISTS grant_form_fields (
   CONSTRAINT fk_grant_field_form FOREIGN KEY (form_id) REFERENCES grant_forms(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-ALTER TABLE grant_applications
-  ADD COLUMN IF NOT EXISTS form_id BIGINT UNSIGNED NULL AFTER event_id,
-  ADD COLUMN IF NOT EXISTS form_snapshot_json JSON NULL AFTER documents_json;
+SET @grant_form_id_column_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'grant_applications'
+    AND COLUMN_NAME = 'form_id'
+);
+SET @grant_form_id_column_sql = IF(
+  @grant_form_id_column_exists = 0,
+  'ALTER TABLE grant_applications ADD COLUMN form_id BIGINT UNSIGNED NULL AFTER event_id',
+  'SELECT 1'
+);
+PREPARE grant_form_id_column_stmt FROM @grant_form_id_column_sql;
+EXECUTE grant_form_id_column_stmt;
+DEALLOCATE PREPARE grant_form_id_column_stmt;
+
+SET @grant_form_snapshot_column_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'grant_applications'
+    AND COLUMN_NAME = 'form_snapshot_json'
+);
+SET @grant_form_snapshot_column_sql = IF(
+  @grant_form_snapshot_column_exists = 0,
+  'ALTER TABLE grant_applications ADD COLUMN form_snapshot_json JSON NULL AFTER documents_json',
+  'SELECT 1'
+);
+PREPARE grant_form_snapshot_column_stmt FROM @grant_form_snapshot_column_sql;
+EXECUTE grant_form_snapshot_column_stmt;
+DEALLOCATE PREPARE grant_form_snapshot_column_stmt;
 
 SET @grant_form_fk_exists = (
   SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS

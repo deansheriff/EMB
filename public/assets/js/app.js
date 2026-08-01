@@ -144,6 +144,89 @@
     });
   });
 
+  const supportChat = qs("[data-support-chat]");
+  if (supportChat) {
+    const panel = qs("[data-chat-panel]", supportChat);
+    const launcher = qs("[data-chat-toggle]", supportChat);
+    const closeButton = qs("[data-chat-close]", supportChat);
+    const externalOpeners = qsa("[data-chat-open]");
+    const form = qs("[data-chat-form]", supportChat);
+    const message = qs("[data-chat-message]", supportChat);
+    let lastFocused = null;
+    let hideTimer;
+
+    const updateExpandedState = (open) => {
+      launcher?.setAttribute("aria-expanded", String(open));
+      externalOpeners.forEach((button) => button.setAttribute("aria-expanded", String(open)));
+    };
+
+    const openChat = (trigger) => {
+      if (!panel) return;
+      window.clearTimeout(hideTimer);
+      lastFocused = trigger || document.activeElement;
+      panel.hidden = false;
+      updateExpandedState(true);
+      window.requestAnimationFrame(() => {
+        panel.classList.add("is-open");
+        closeButton?.focus({ preventScroll: true });
+      });
+    };
+
+    const closeChat = (restoreFocus = false) => {
+      if (!panel || panel.hidden) return;
+      panel.classList.remove("is-open");
+      updateExpandedState(false);
+      hideTimer = window.setTimeout(() => {
+        if (!panel.classList.contains("is-open")) panel.hidden = true;
+      }, 200);
+      if (restoreFocus && lastFocused instanceof HTMLElement) lastFocused.focus({ preventScroll: true });
+    };
+
+    launcher?.addEventListener("click", () => {
+      if (launcher.getAttribute("aria-expanded") === "true") closeChat(true);
+      else openChat(launcher);
+    });
+    externalOpeners.forEach((button) => button.addEventListener("click", () => openChat(button)));
+    closeButton?.addEventListener("click", () => closeChat(true));
+
+    qsa("[data-chat-faq]", supportChat).forEach((button) => {
+      button.addEventListener("click", () => {
+        const answer = qs(`#${CSS.escape(button.getAttribute("aria-controls"))}`, supportChat);
+        const shouldOpen = button.getAttribute("aria-expanded") !== "true";
+        qsa("[data-chat-faq]", supportChat).forEach((otherButton) => {
+          if (otherButton === button) return;
+          otherButton.setAttribute("aria-expanded", "false");
+          const otherAnswer = qs(`#${CSS.escape(otherButton.getAttribute("aria-controls"))}`, supportChat);
+          if (otherAnswer) otherAnswer.hidden = true;
+        });
+        button.setAttribute("aria-expanded", String(shouldOpen));
+        if (answer) answer.hidden = !shouldOpen;
+      });
+    });
+
+    form?.addEventListener("submit", (event) => {
+      const fallbackMessage = "Hello Emb Chronicles, I'd like to make an enquiry.";
+      const outgoingMessage = message?.value.trim() || fallbackMessage;
+      if (message && !message.value.trim()) message.value = outgoingMessage;
+      try {
+        const destination = new URL(supportChat.dataset.whatsappUrl || form.action, window.location.href);
+        destination.searchParams.set("text", outgoingMessage);
+        event.preventDefault();
+        window.open(destination.toString(), "_blank", "noopener,noreferrer");
+      } catch (_) {
+        // Keep the form's standard GET submission as a no-JavaScript-compatible fallback.
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && panel && !panel.hidden) closeChat(true);
+    });
+    document.addEventListener("click", (event) => {
+      if (!panel || panel.hidden || supportChat.contains(event.target) || event.target.closest("[data-chat-open]")) return;
+      closeChat(false);
+    });
+  }
+
   qsa("[data-flash-close]").forEach((button) => button.addEventListener("click", () => button.closest("[data-flash]").remove()));
   qsa("[data-password-toggle]").forEach((button) => button.addEventListener("click", () => {
     const input = button.parentElement.querySelector("input");

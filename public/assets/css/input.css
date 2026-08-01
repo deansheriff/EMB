@@ -108,7 +108,27 @@
   .flash-success { @apply border-sage/30 text-sage; }
   .flash-error { @apply border-red-200 text-red-700; }
   .flash button { @apply ml-auto text-xl leading-none text-muted; }
-  .whatsapp-fab { @apply fixed bottom-4 right-4 z-40 flex min-h-12 items-center gap-2 rounded-full bg-[#1F8F5F] px-4 font-bold text-white shadow-soft transition hover:-translate-y-1 hover:bg-[#16734B]; }
+  .support-chat-launcher { @apply fixed bottom-4 right-4 z-[70] flex min-h-14 items-center gap-2 rounded-full bg-[#1F8F5F] px-4 text-sm font-bold text-white shadow-[0_14px_36px_rgba(31,143,95,.28)] transition duration-200 hover:-translate-y-1 hover:bg-[#16734B]; }
+  .support-chat-panel { @apply fixed bottom-[5.5rem] right-4 z-[70] flex w-[calc(100%-2rem)] max-w-[430px] origin-bottom-right translate-y-4 scale-[.98] flex-col overflow-hidden rounded-[28px] border border-line bg-white opacity-0 shadow-[0_24px_80px_rgba(72,43,50,.24)] transition duration-200; max-height: min(720px, calc(100dvh - 7rem)); }
+  .support-chat-panel.is-open { @apply translate-y-0 scale-100 opacity-100; }
+  .support-chat-header { @apply flex shrink-0 items-center gap-3 bg-wine px-5 py-4; }
+  .support-chat-avatar { @apply grid size-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 font-display text-base font-semibold text-white; }
+  .support-chat-close { @apply ml-auto grid size-10 shrink-0 place-items-center rounded-full border border-white/15 bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white; }
+  .support-chat-scroll { @apply min-h-0 flex-1 overflow-y-auto overscroll-contain bg-ivory px-5 py-5; scrollbar-color: #D9C5C8 transparent; scrollbar-width: thin; }
+  .support-chat-intro { @apply mb-5 rounded-2xl border border-line bg-white p-4; }
+  .support-chat-label { @apply text-[11px] font-bold uppercase tracking-[.16em] text-berry; }
+  .support-chat-faq { @apply overflow-hidden rounded-2xl border border-line bg-white; }
+  .support-chat-faq-button { @apply flex min-h-14 w-full items-center justify-between gap-4 px-4 py-3 text-left text-sm font-bold leading-5 text-wine transition hover:bg-blush/40; }
+  .support-chat-faq-icon { @apply size-5 shrink-0 text-berry transition duration-200; }
+  .support-chat-faq-button[aria-expanded="true"] .support-chat-faq-icon { @apply rotate-180; }
+  .support-chat-faq-answer { @apply border-t border-line/70 px-4 pb-4 pt-3 text-[13px] leading-6 text-muted; }
+  .support-chat-faq-answer a { @apply mt-2 inline-flex font-bold text-berry hover:text-wine hover:underline; }
+  .support-chat-links { @apply mt-3 grid gap-2 sm:grid-cols-2; }
+  .support-chat-links a { @apply flex min-h-12 items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-2 text-xs font-bold text-wine transition hover:border-berry hover:bg-blush/30; }
+  .support-chat-composer { @apply shrink-0 border-t border-line bg-white px-5 py-4; }
+  .support-chat-composer label { @apply text-[11px] font-bold uppercase tracking-[.16em] text-berry; }
+  .support-chat-composer textarea { @apply mt-2 block min-h-[78px] w-full resize-none rounded-xl border-line bg-ivory px-4 py-3 text-sm leading-5 text-ink placeholder:text-muted/55 focus:border-berry focus:ring-berry; }
+  .support-chat-composer button { @apply mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1F8F5F] px-4 text-sm font-bold text-white transition hover:bg-[#16734B]; }
 
   .admin-body { @apply min-w-[320px]; }
   .admin-sidebar { @apply fixed inset-y-0 left-0 z-50 w-[264px] -translate-x-full overflow-y-auto bg-wine p-6 text-white transition lg:sticky lg:top-0 lg:h-screen lg:translate-x-0; }
@@ -177,4 +197,15 @@
 @media (max-width: 1023px) {
   body.menu-open { overflow: hidden; }
   .admin-sidebar::after { content: ""; }
+}
+
+@media (max-width: 639px) {
+  .support-chat-launcher { @apply bottom-3 right-3 size-14 justify-center p-0; }
+  .support-chat-panel { @apply bottom-[5.25rem] left-3 right-3 w-auto rounded-[24px]; max-height: calc(100dvh - 7rem); }
+  .support-chat-header { @apply px-4; }
+  .support-chat-scroll, .support-chat-composer { @apply px-4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .support-chat-panel, .support-chat-launcher, .support-chat-faq-icon { transition-duration: 0.01ms; }
 }
