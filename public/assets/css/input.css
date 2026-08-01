@@ -63,7 +63,7 @@
   .filter-chip { @apply inline-flex shrink-0 items-center rounded-full border border-line bg-white px-4 py-2 text-xs font-bold text-muted transition hover:border-berry hover:text-wine; }
   .filter-chip.is-active { @apply border-berry bg-berry text-white; }
   .carousel-button { @apply grid size-12 place-items-center rounded-full border border-line bg-white text-lg text-wine transition hover:bg-wine hover:text-white; }
-  .testimonial-stage { @apply relative min-h-[350px]; }
+  .testimonial-stage { @apply relative min-h-[350px] overflow-hidden; }
   .testimonial { @apply pointer-events-none absolute inset-0 translate-x-6 rounded-[28px] border border-line bg-white p-7 opacity-0 shadow-soft transition duration-500 sm:p-10; }
   .testimonial.is-active { @apply pointer-events-auto translate-x-0 opacity-100; }
   .testimonial blockquote { @apply font-display text-3xl leading-[1.35] text-wine sm:text-4xl; }
