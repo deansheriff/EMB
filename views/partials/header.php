@@ -1,6 +1,6 @@
 <?php
 $current = request_path();
-$logo = (string) setting('logo_path', '');
+$logo = MediaUploader::preferOriginal((string) setting('logo_path', ''));
 $navItems = [
     '/' => 'Home',
     '/about' => 'About',

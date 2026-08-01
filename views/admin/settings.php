@@ -8,12 +8,12 @@
                 <div class="mt-6 form-grid">
                     <div class="form-field"><label>Site name</label><input class="form-control" name="site_name" value="<?= e($settings['site_name'] ?? '') ?>"></div>
                     <div class="form-field"><label>Tagline</label><input class="form-control" name="tagline" value="<?= e($settings['tagline'] ?? '') ?>"></div>
-                    <div class="form-field"><label>Upload logo</label><input class="file-control" type="file" name="logo" accept="image/jpeg,image/png,image/webp"><p class="field-help">A new upload replaces the current logo.</p></div>
+                    <div class="form-field"><label>Upload logo</label><input class="file-control" type="file" name="logo" accept="image/jpeg,image/png,image/webp"><p class="field-help">A new upload replaces the current logo. Use a transparent PNG or WebP for a background-free logo.</p></div>
                     <div class="form-field"><label>Logo path / URL</label><input class="form-control" name="logo_path" value="<?= e($settings['logo_path'] ?? '') ?>" placeholder="/uploads/… or https://…"></div>
                     <?php if (!empty($settings['logo_path'])): ?>
                         <div class="form-field md:col-span-2">
                             <label>Current logo</label>
-                            <div class="rounded-xl border border-line bg-ivory p-4"><img src="<?= e(media_url($settings['logo_path'])) ?>" alt="" class="h-16 max-w-full object-contain"></div>
+                            <div class="rounded-xl border border-line bg-ivory p-4"><img src="<?= e(media_url(MediaUploader::preferOriginal((string) $settings['logo_path']))) ?>" alt="" class="h-16 max-w-full object-contain"></div>
                             <label class="consent-row mt-3"><input type="checkbox" name="remove_logo" value="1"><span>Remove the logo and use the text fallback</span></label>
                         </div>
                     <?php endif; ?>

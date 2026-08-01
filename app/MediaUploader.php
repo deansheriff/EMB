@@ -9,6 +9,28 @@ final class MediaUploader
         'image/webp' => 'webp',
     ];
 
+    public static function preferOriginal(string $path): string
+    {
+        $path = trim($path);
+        if ($path === '' || preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+
+        $normalized = '/' . ltrim(str_replace('\\', '/', $path), '/');
+        if (!preg_match('#^/uploads/(\d{4}/\d{2})/([a-f0-9]{24})-(?:480|960|1440)\.webp$#i', $normalized, $matches)) {
+            return $path;
+        }
+
+        foreach (self::MIME_MAP as $extension) {
+            $relative = 'uploads/' . $matches[1] . '/' . $matches[2] . '-original.' . $extension;
+            if (is_file(PUBLIC_PATH . '/' . $relative)) {
+                return '/' . $relative;
+            }
+        }
+
+        return $path;
+    }
+
     public static function store(array $file, string $altText = ''): array
     {
         if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
@@ -82,8 +104,13 @@ final class MediaUploader
         $sourceHeight = imagesy($source);
         $targetHeight = max(1, (int) round($sourceHeight * ($targetWidth / $sourceWidth)));
         $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
-        imagealphablending($canvas, true);
+        // A true-colour GD canvas starts with opaque black pixels. Clear it to
+        // full transparency before resampling so PNG and WebP logos keep their
+        // transparent background in the generated WebP variants.
+        imagealphablending($canvas, false);
         imagesavealpha($canvas, true);
+        $transparent = imagecolorallocatealpha($canvas, 0, 0, 0, 127);
+        imagefilledrectangle($canvas, 0, 0, $targetWidth, $targetHeight, $transparent);
         imagecopyresampled($canvas, $source, 0, 0, 0, 0, $targetWidth, $targetHeight, $sourceWidth, $sourceHeight);
         $target = $directory . '/' . $base . '-' . $targetWidth . '.webp';
         $saved = imagewebp($canvas, $target, 82);

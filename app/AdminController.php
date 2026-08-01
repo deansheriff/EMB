@@ -506,7 +506,9 @@ function admin_settings(): void
         } elseif (!empty($_FILES['logo']['name'])) {
             try {
                 $media = MediaUploader::store($_FILES['logo'], (string) ($_POST['site_name'] ?? 'Emb Chronicles') . ' logo');
-                $_POST['logo_path'] = $media['path'];
+                // Logos should retain their original alpha channel and sharp
+                // edges rather than depending on a generated photo variant.
+                $_POST['logo_path'] = $media['variants']['original'] ?? $media['path'];
             } catch (RuntimeException $exception) {
                 flash('error', $exception->getMessage());
                 redirect('/admin/settings');
