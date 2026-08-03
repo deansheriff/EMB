@@ -112,14 +112,13 @@ function public_dispatch(string $path): void
             return;
 
         case '/appointment':
-            $fee = money_to_subunit((string) setting('appointment_fee', '0'));
             $availability = appointment_availability_context();
+            $appointmentTypes = query_all('SELECT id, name, description, price, currency FROM appointment_types WHERE is_active = 1 ORDER BY sort_order, name');
             render('public/appointment', [
                 'title' => 'Book a Session',
                 'description' => 'Book a fertility education, clinic guidance, IVF clarity, or STEM career consultation.',
-                'paymentRequired' => PaystackClient::configured(),
-                'appointmentFee' => $fee,
-                'currency' => strtoupper((string) setting('paystack_currency', 'NGN')),
+                'paymentsEnabled' => PaystackClient::configured(),
+                'appointmentTypes' => $appointmentTypes,
                 'availability' => $availability,
             ]);
             clear_old();
@@ -339,7 +338,7 @@ function submit_appointment(): void
         flash('error', 'Online appointment booking is temporarily paused. Please contact the team for help.');
         redirect('/appointment');
     }
-    $required = ['consultation_type', 'preferred_date', 'availability_slot_id', 'name', 'phone', 'preferred_contact'];
+    $required = ['appointment_type_id', 'preferred_date', 'availability_slot_id', 'name', 'phone', 'preferred_contact'];
     foreach ($required as $field) {
         if (trim((string) ($_POST[$field] ?? '')) === '') {
             flash('error', 'Please complete all required fields.');
@@ -356,10 +355,18 @@ function submit_appointment(): void
         flash('error', 'Choose a valid appointment date.');
         redirect('/appointment');
     }
+    $appointmentType = query_one(
+        'SELECT id, name, price, currency FROM appointment_types WHERE id = ? AND is_active = 1 LIMIT 1',
+        [(int) $_POST['appointment_type_id']]
+    );
+    if (!$appointmentType) {
+        flash('error', 'Choose an available appointment type.');
+        redirect('/appointment');
+    }
     $bookingCode = new_booking_code();
-    $currency = strtoupper((string) setting('paystack_currency', 'NGN'));
-    $amount = PaystackClient::configured() ? money_to_subunit((string) setting('appointment_fee', '0')) : 0;
-    $requiresPayment = $amount > 0;
+    $currency = strtoupper((string) $appointmentType['currency']);
+    $amount = (int) $appointmentType['price'];
+    $requiresPayment = PaystackClient::configured() && $amount > 0;
     $status = $requiresPayment ? 'pending_payment' : 'new';
     $paymentStatus = $requiresPayment ? 'pending' : 'not_required';
 
@@ -410,12 +417,13 @@ function submit_appointment(): void
         }
         $stmt = $pdo->prepare(
             'INSERT INTO appointments
-             (booking_code, consultation_type, preferred_date, preferred_time, availability_slot_id, name, email, phone, preferred_contact, message, status, amount_due, currency, payment_status, consented_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
+             (booking_code, consultation_type, appointment_type_id, preferred_date, preferred_time, availability_slot_id, name, email, phone, preferred_contact, message, status, amount_due, currency, payment_status, consented_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())'
         );
         $stmt->execute([
             $bookingCode,
-            trim((string) $_POST['consultation_type']),
+            $appointmentType['name'],
+            $appointmentType['id'],
             $preferredDate,
             $slot['start_time'],
             $slotId,
@@ -1047,6 +1055,7 @@ function show_appointment_status(string $bookingCode): void
     render('public/appointment-status', [
         'appointment' => $appointment,
         'payments' => $payments,
+        'paymentAvailable' => PaystackClient::configured(),
         'title' => 'Appointment ' . $appointment['booking_code'],
         'description' => 'Review the status of your Emb Chronicles appointment request.',
     ]);
@@ -1063,7 +1072,9 @@ function send_appointment_confirmation(int $appointmentId, bool $paid): bool
     }
     $paymentLine = $paid
         ? '<p><strong>Payment:</strong> ' . e(format_money((int) $appointment['amount_due'], $appointment['currency'])) . ' confirmed</p>'
-        : '<p><strong>Payment:</strong> No online payment required</p>';
+        : ((int) $appointment['amount_due'] > 0
+            ? '<p><strong>Session fee:</strong> ' . e(format_money((int) $appointment['amount_due'], $appointment['currency'])) . '. The team will confirm payment arrangements.</p>'
+            : '<p><strong>Session fee:</strong> No fee</p>');
     $date = $appointment['preferred_date'] ? e(format_date($appointment['preferred_date'])) : 'Flexible';
     $time = $appointment['preferred_time'] ? e(substr($appointment['preferred_time'], 0, 5)) : 'Flexible';
     $html = '<h1 style="color:#6e3345;margin-top:0">Your appointment request is confirmed</h1>'

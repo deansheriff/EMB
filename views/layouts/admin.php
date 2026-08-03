@@ -12,6 +12,7 @@ $nav = [
     '/admin/grant-applications' => ['Grant applications', 'grant', 'grants.manage'],
     '/admin/contact-submissions' => ['Contact submissions', 'mail', 'contacts.manage'],
     '/admin/appointments' => ['Appointments', 'clock', 'appointments.manage'],
+    '/admin/appointment-types' => ['Appointment types', 'heart', 'appointments.manage'],
     '/admin/availability' => ['Availability', 'calendar', 'appointments.manage'],
     '/admin/email-log' => ['Email log', 'mail', 'email_log.view'],
     '/admin/data-tools' => ['Import / export', 'file', ['services.manage', 'events.manage', 'testimonials.manage', 'contacts.manage', 'grants.manage']],

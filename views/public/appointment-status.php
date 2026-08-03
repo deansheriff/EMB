@@ -28,7 +28,7 @@ $scheduled = $appointment['status'] === 'scheduled' && $appointment['scheduled_a
                 <?php if ($scheduled): ?><div><dt class="font-bold text-wine">Confirmed schedule</dt><dd class="mt-1 text-muted"><?= e(format_date($appointment['scheduled_at'], 'M j, Y · g:i A')) ?></dd></div><?php endif; ?>
             </dl>
 
-            <?php if (!$paid && (int) $appointment['amount_due'] > 0): ?>
+            <?php if (!$paid && $paymentAvailable && $appointment['payment_status'] !== 'not_required' && (int) $appointment['amount_due'] > 0): ?>
                 <div class="mt-8 rounded-2xl border border-amber/30 bg-[#FFF7EB] p-5">
                     <p class="font-bold text-wine"><?= $pending ? 'Payment is still pending.' : 'Your payment is not complete.' ?></p>
                     <p class="mt-2 text-sm leading-6 text-muted">Use the button below to open a new secure Paystack checkout. If you have already paid, wait a moment and refresh before trying again.</p>
@@ -50,7 +50,7 @@ $scheduled = $appointment['status'] === 'scheduled' && $appointment['scheduled_a
             <div class="rounded-[28px] bg-blush p-8">
                 <p class="eyebrow">What happens next</p>
                 <ol class="mt-5 space-y-4 text-sm leading-6 text-muted">
-                    <li><strong class="text-wine">1.</strong> Payment is verified against Paystack’s server records.</li>
+                    <li><strong class="text-wine">1.</strong> <?= $appointment['payment_status'] === 'not_required' ? 'The team reviews your request and confirms any next steps.' : 'Payment is verified against Paystack’s server records.' ?></li>
                     <li><strong class="text-wine">2.</strong> The team reviews your preferred timing.</li>
                     <li><strong class="text-wine">3.</strong> You receive the confirmed schedule using your preferred contact method.</li>
                 </ol>

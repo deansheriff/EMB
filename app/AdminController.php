@@ -26,6 +26,7 @@ function admin_dispatch(string $path): void
         '/admin/settings' => 'settings.manage',
         '/admin/contact-submissions' => 'contacts.manage',
         '/admin/appointments' => 'appointments.manage',
+        '/admin/appointment-types' => 'appointments.manage',
         '/admin/availability' => 'appointments.manage',
         '/admin/email-log' => 'email_log.view',
         '/admin/page-content' => 'content.manage',
@@ -73,6 +74,9 @@ function admin_dispatch(string $path): void
             return;
         case '/admin/appointments':
             admin_appointments();
+            return;
+        case '/admin/appointment-types':
+            admin_appointment_types();
             return;
         case '/admin/availability':
             admin_availability();
@@ -495,7 +499,7 @@ function admin_settings(): void
         'deployment_status_message', 'deployment_status_url',
         'smtp_host', 'smtp_port', 'smtp_encryption', 'smtp_username', 'smtp_from_email',
         'smtp_from_name', 'smtp_reply_to', 'smtp_admin_email',
-        'paystack_public_key', 'paystack_currency', 'appointment_fee',
+        'paystack_public_key', 'paystack_currency',
     ];
     $booleans = ['smtp_enabled', 'email_confirmations_enabled', 'paystack_enabled', 'maintenance_enabled'];
     $secrets = ['smtp_password', 'paystack_secret_key'];
@@ -540,11 +544,6 @@ function admin_settings(): void
         if ($socialImage === '') {
             $_POST['social_share_image_alt'] = '';
         }
-        $fee = trim((string) ($_POST['appointment_fee'] ?? '0'));
-        if (!preg_match('/^\d+(?:\.\d{1,2})?$/', str_replace([',', ' '], '', $fee))) {
-            flash('error', 'Enter the appointment fee as a valid amount with no more than two decimal places.');
-            redirect('/admin/settings');
-        }
         foreach (['smtp_from_email', 'smtp_reply_to', 'smtp_admin_email'] as $emailKey) {
             $value = trim((string) ($_POST[$emailKey] ?? ''));
             if ($value !== '' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
@@ -581,8 +580,9 @@ function admin_settings(): void
             : ((string) ($_POST['paystack_secret_key'] ?? '') !== ''
                 ? (string) $_POST['paystack_secret_key']
                 : (string) ($currentSettings['paystack_secret_key'] ?? ''));
-        if (isset($_POST['paystack_enabled']) && ($effectivePaystackSecret === '' || money_to_subunit($fee) < 1)) {
-            flash('error', 'Add a Paystack secret key and an appointment fee greater than zero before enabling payments.');
+        $paidAppointmentTypes = (int) query_value('SELECT COUNT(*) FROM appointment_types WHERE is_active = 1 AND price > 0');
+        if (isset($_POST['paystack_enabled']) && ($effectivePaystackSecret === '' || $paidAppointmentTypes < 1)) {
+            flash('error', 'Add a Paystack secret key and at least one active appointment type with a price before enabling payments.');
             redirect('/admin/settings');
         }
         if (isset($_POST['smtp_enabled'])
@@ -600,7 +600,6 @@ function admin_settings(): void
             if (array_key_exists($key, $_POST)) {
                 $type = match (true) {
                     in_array($key, ['stats_members', 'stats_families', 'smtp_port'], true) => 'number',
-                    $key === 'appointment_fee' => 'money',
                     in_array($key, ['smtp_from_email', 'smtp_reply_to', 'smtp_admin_email'], true) => 'email',
                     in_array($key, ['logo_path', 'social_share_image'], true) => 'image',
                     in_array($key, ['default_meta_description', 'footer_blurb', 'maintenance_message'], true) => 'textarea',
@@ -719,6 +718,53 @@ function admin_appointments(): void
         ? query_all('SELECT * FROM appointment_payments WHERE appointment_id = ? ORDER BY created_at DESC', [$selected['id']])
         : [];
     render('admin/appointments', compact('appointments', 'selected', 'payments', 'paymentFilter') + ['title' => 'Appointments'], 'admin');
+}
+
+function admin_appointment_types(): void
+{
+    if (is_post()) {
+        verify_csrf();
+        $action = (string) ($_POST['action'] ?? 'save');
+        $id = (int) ($_POST['id'] ?? 0);
+        if ($action === 'delete') {
+            db()->prepare('DELETE FROM appointment_types WHERE id = ?')->execute([$id]);
+            audit('delete', 'appointment_type', $id);
+            flash('success', 'Appointment type removed. Existing booking records were preserved.');
+            redirect('/admin/appointment-types');
+        }
+
+        $name = trim((string) ($_POST['name'] ?? ''));
+        $description = trim((string) ($_POST['description'] ?? ''));
+        $priceInput = str_replace([',', ' '], '', trim((string) ($_POST['price'] ?? '0')));
+        $sortOrder = max(0, min(10000, (int) ($_POST['sort_order'] ?? 0)));
+        if ($name === '' || mb_strlen($name) > 190 || !preg_match('/^\d{1,9}(?:\.\d{1,2})?$/', $priceInput)) {
+            flash('error', 'Enter a name and a valid non-negative price with no more than nine digits and two decimal places.');
+            redirect('/admin/appointment-types' . ($id ? '?edit=' . $id : '?new=1'));
+        }
+        $price = money_to_subunit($priceInput);
+        try {
+            if ($id) {
+                db()->prepare('UPDATE appointment_types SET name = ?, description = ?, price = ?, currency = ?, sort_order = ?, is_active = ? WHERE id = ?')
+                    ->execute([$name, $description, $price, 'NGN', $sortOrder, isset($_POST['is_active']) ? 1 : 0, $id]);
+            } else {
+                db()->prepare('INSERT INTO appointment_types (name, description, price, currency, sort_order, is_active) VALUES (?, ?, ?, ?, ?, ?)')
+                    ->execute([$name, $description, $price, 'NGN', $sortOrder, isset($_POST['is_active']) ? 1 : 0]);
+                $id = (int) db()->lastInsertId();
+            }
+        } catch (PDOException) {
+            flash('error', 'An appointment type with that name already exists.');
+            redirect('/admin/appointment-types' . ($id ? '?edit=' . $id : '?new=1'));
+        }
+        audit('save', 'appointment_type', $id);
+        flash('success', 'Appointment type and price saved.');
+        redirect('/admin/appointment-types?edit=' . $id);
+    }
+
+    $appointmentTypes = query_all('SELECT * FROM appointment_types ORDER BY sort_order, name');
+    $editing = !empty($_GET['new'])
+        ? null
+        : (!empty($_GET['edit']) ? query_one('SELECT * FROM appointment_types WHERE id = ?', [(int) $_GET['edit']]) : ($appointmentTypes[0] ?? null));
+    render('admin/appointment-types', compact('appointmentTypes', 'editing') + ['title' => 'Appointment types'], 'admin');
 }
 
 function admin_availability(): void

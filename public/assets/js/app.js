@@ -272,6 +272,36 @@
     button.textContent = input.type === "password" ? "Show" : "Hide";
   }));
 
+  const appointmentTypeOptions = qsa("[data-appointment-type-option]");
+  if (appointmentTypeOptions.length) {
+    const priceOutput = qs("[data-appointment-price]");
+    const paymentNote = qs("[data-appointment-payment-note]");
+    const submitButton = qs("[data-appointment-submit]");
+    const paymentsEnabled = submitButton?.dataset.paymentsEnabled === "1";
+    const updateAppointmentPrice = () => {
+      const selected = appointmentTypeOptions.find((option) => option.checked);
+      if (!selected) {
+        if (priceOutput) priceOutput.textContent = "Choose a session";
+        if (paymentNote) paymentNote.textContent = "Select an appointment type to see its fee and payment step.";
+        if (submitButton) submitButton.textContent = "Choose a session to continue";
+        return;
+      }
+      const price = Number(selected.dataset.price || 0);
+      const priceLabel = selected.dataset.priceLabel || "No fee";
+      if (priceOutput) priceOutput.textContent = priceLabel;
+      if (paymentNote) {
+        paymentNote.textContent = price > 0
+          ? (paymentsEnabled ? "Your request continues to secure Paystack checkout." : "The team will confirm payment arrangements with you.")
+          : "No online payment is required for this option.";
+      }
+      if (submitButton) submitButton.textContent = price > 0 && paymentsEnabled
+        ? `Continue to secure payment — ${priceLabel}`
+        : "Request this session";
+    };
+    appointmentTypeOptions.forEach((option) => option.addEventListener("change", updateAppointmentPrice));
+    updateAppointmentPrice();
+  }
+
   const appointmentAvailability = qs("[data-appointment-availability]");
   if (appointmentAvailability) {
     const dateInput = qs('[name="preferred_date"]', appointmentAvailability);

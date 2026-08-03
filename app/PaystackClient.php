@@ -15,8 +15,7 @@ final class PaystackClient
     public static function configured(): bool
     {
         return (string) setting('paystack_enabled', '0') === '1'
-            && trim((string) setting('paystack_secret_key')) !== ''
-            && money_to_subunit((string) setting('appointment_fee', '0')) > 0;
+            && trim((string) setting('paystack_secret_key')) !== '';
     }
 
     public static function fromSettings(): self

@@ -232,6 +232,20 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   INDEX idx_contact_inbox (is_archived, is_read, created_at)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS appointment_types (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(190) NOT NULL,
+  description TEXT NULL,
+  price BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Amount in the currency subunit (kobo for NGN)',
+  currency CHAR(3) NOT NULL DEFAULT 'NGN',
+  sort_order INT UNSIGNED NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_appointment_type_name (name),
+  INDEX idx_appointment_types_public (is_active, sort_order, name)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS appointment_availability_slots (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   weekday TINYINT UNSIGNED NOT NULL COMMENT 'ISO-8601 weekday: 1=Monday, 7=Sunday',
@@ -257,6 +271,7 @@ CREATE TABLE IF NOT EXISTS appointments (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   booking_code VARCHAR(48) NOT NULL UNIQUE,
   consultation_type VARCHAR(190) NOT NULL,
+  appointment_type_id BIGINT UNSIGNED NULL,
   preferred_date DATE NULL,
   preferred_time TIME NULL,
   availability_slot_id BIGINT UNSIGNED NULL,
@@ -279,8 +294,10 @@ CREATE TABLE IF NOT EXISTS appointments (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_appointments_status (status, created_at),
   INDEX idx_appointments_payment (payment_status, created_at),
+  INDEX idx_appointments_type (appointment_type_id, created_at),
   INDEX idx_appointments_availability (availability_slot_id, preferred_date, preferred_time),
   INDEX idx_appointments_booking_date (preferred_date, status, availability_slot_id),
+  CONSTRAINT fk_appointment_type FOREIGN KEY (appointment_type_id) REFERENCES appointment_types(id) ON DELETE SET NULL,
   CONSTRAINT fk_appointment_availability_slot FOREIGN KEY (availability_slot_id) REFERENCES appointment_availability_slots(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 

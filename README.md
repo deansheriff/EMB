@@ -23,6 +23,7 @@ Approved design source: [EMB Chronicles on Google Stitch](https://stitch.withgoo
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260731_grant_forms.sql"
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260801_editable_page_media.sql"
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260801_availability_maintenance.sql"
+   C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260803_appointment_types.sql"
    ```
 
 3. Install PHP and frontend dependencies, then build the stylesheet:
