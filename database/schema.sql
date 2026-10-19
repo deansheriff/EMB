@@ -191,14 +191,40 @@ CREATE TABLE IF NOT EXISTS grant_form_fields (
 CREATE TABLE IF NOT EXISTS testimonials (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   client_name VARCHAR(190) NOT NULL,
+  submitter_email VARCHAR(190) NULL,
   photo_path VARCHAR(500) NULL,
   photo_alt VARCHAR(255) NULL,
   quote TEXT NOT NULL,
+  source ENUM('admin','public') NOT NULL DEFAULT 'admin',
+  approval_status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved',
+  consented_at DATETIME NULL,
+  reviewed_by BIGINT UNSIGNED NULL,
+  reviewed_at DATETIME NULL,
   sort_order INT NOT NULL DEFAULT 0,
   is_visible TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_testimonial_name (client_name)
+  INDEX idx_testimonials_moderation (approval_status, is_visible, created_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS blog_posts (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  excerpt TEXT NOT NULL,
+  content LONGTEXT NOT NULL,
+  cover_image VARCHAR(500) NULL,
+  cover_alt VARCHAR(255) NULL,
+  author_name VARCHAR(190) NULL,
+  is_featured TINYINT(1) NOT NULL DEFAULT 0,
+  status ENUM('draft','published') NOT NULL DEFAULT 'draft',
+  published_at DATETIME NULL,
+  seo_title VARCHAR(255) NULL,
+  seo_description VARCHAR(320) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_blog_public (status, published_at),
+  INDEX idx_blog_featured (status, is_featured, published_at)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS page_content (

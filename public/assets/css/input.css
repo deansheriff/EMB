@@ -158,7 +158,8 @@
   .status-published, .status-completed, .status-awarded { @apply bg-emerald-50 text-emerald-700; }
   .status-draft, .status-new, .status-submitted { @apply bg-slate-100 text-slate-600; }
   .status-unread, .status-cancelled, .status-declined, .status-closed { @apply bg-red-50 text-red-700; }
-  .status-contacted, .status-in_review, .status-pending_payment { @apply bg-amber-50 text-amber-700; }
+  .status-contacted, .status-in_review, .status-pending, .status-pending_payment { @apply bg-[#FFF7EB] text-[#7A4A0B]; }
+  .status-rejected { @apply bg-red-50 text-red-700; }
   .status-scheduled, .status-shortlisted { @apply bg-blue-50 text-blue-700; }
   .admin-split { @apply grid items-start gap-6 xl:grid-cols-[.75fr_1.25fr]; }
   .admin-list-card { @apply flex items-center gap-4 rounded-xl border border-line bg-white p-4 transition hover:border-berry/50 hover:bg-blush/20; }

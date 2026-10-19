@@ -8,6 +8,7 @@ $navItems = [
     '/fiyff-foundation' => 'FIYFF Foundation',
     '/community' => 'Communities',
     '/events' => 'Events',
+    '/blog' => 'Blog',
     '/contact' => 'Contact',
 ];
 ?>

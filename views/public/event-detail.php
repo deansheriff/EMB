@@ -30,6 +30,20 @@
         </aside>
         <article>
             <div class="prose-warm prose-large"><?= $event['description'] ?></div>
+            <?php if ($gallery): ?>
+                <section class="mt-12" aria-labelledby="event-gallery-title">
+                    <p class="eyebrow">Event gallery</p>
+                    <h2 id="event-gallery-title" class="mt-3 font-display text-4xl text-wine">Moments from this event</h2>
+                    <div class="mt-7 grid gap-4 sm:grid-cols-2">
+                        <?php foreach ($gallery as $image): ?>
+                            <figure class="overflow-hidden rounded-2xl border border-line bg-ivory">
+                                <img src="<?= e(media_url($image['image_path'])) ?>" alt="<?= e($image['alt_text']) ?>" class="aspect-[4/3] w-full object-cover" loading="lazy">
+                                <figcaption class="p-4 text-sm leading-6 text-muted"><?= e($image['alt_text']) ?></figcaption>
+                            </figure>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+            <?php endif; ?>
             <?php if ($event['event_type'] === 'Grant Program'): ?>
                 <div class="mt-10 rounded-2xl border border-amber/30 bg-[#FFF7EB] p-6">
                     <h2 class="font-display text-2xl text-wine">A transparent application journey</h2>

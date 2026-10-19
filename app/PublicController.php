@@ -40,6 +40,10 @@ function public_dispatch(string $path): void
             submit_newsletter();
             return;
         }
+        if ($path === '/testimonials') {
+            submit_public_testimonial();
+            return;
+        }
         if (preg_match('#^/appointment/pay/([A-Z0-9-]+)$#i', $path, $matches)) {
             retry_appointment_payment($matches[1]);
             return;
@@ -59,7 +63,7 @@ function public_dispatch(string $path): void
             $heroes = query_all('SELECT * FROM hero_slides WHERE is_active = 1 ORDER BY sort_order, id');
             $events = query_all("SELECT * FROM events WHERE status = 'published' AND is_featured = 1 ORDER BY event_date ASC LIMIT 3");
             $services = query_all("SELECT * FROM services WHERE status = 'published' ORDER BY is_pinned DESC, sort_order, created_at DESC LIMIT 3");
-            $testimonials = query_all('SELECT * FROM testimonials WHERE is_visible = 1 ORDER BY sort_order, id');
+            $testimonials = query_all("SELECT * FROM testimonials WHERE approval_status = 'approved' AND is_visible = 1 ORDER BY sort_order, id");
             render('public/home', compact('heroes', 'events', 'services', 'testimonials') + [
                 'title' => (string) setting('default_meta_title', 'Emb Chronicles — Fertility Education'),
                 'description' => (string) setting('default_meta_description'),
@@ -85,6 +89,27 @@ function public_dispatch(string $path): void
 
         case '/events':
             public_events_index();
+            return;
+
+        case '/blog':
+            $posts = query_all("SELECT * FROM blog_posts WHERE status = 'published' AND published_at <= NOW() ORDER BY is_featured DESC, published_at DESC");
+            render('public/blog', [
+                'posts' => $posts,
+                'title' => 'Fertility Education Blog',
+                'description' => 'Practical fertility education, treatment insights, community stories, and career guidance from Emb Chronicles.',
+            ]);
+            return;
+
+        case '/testimonials':
+            $testimonials = query_all("SELECT * FROM testimonials WHERE approval_status = 'approved' AND is_visible = 1 ORDER BY sort_order, created_at DESC");
+            render('public/testimonials', [
+                'testimonials' => $testimonials,
+                'submissionsEnabled' => (string) setting('testimonial_submissions_enabled', '1') === '1',
+                'autoApprove' => (string) setting('testimonial_auto_approve', '0') === '1',
+                'title' => 'Community Testimonials',
+                'description' => 'Read experiences shared by the Emb Chronicles community or submit your own testimonial.',
+            ]);
+            clear_old();
             return;
 
         case '/fiyff-foundation':
@@ -172,6 +197,24 @@ function public_dispatch(string $path): void
             'description' => $event['seo_description'] ?: $event['excerpt'],
             'ogImage' => $event['cover_image'],
             'ogImageAlt' => $event['cover_alt'],
+        ]);
+        return;
+    }
+
+    if (preg_match('#^/blog/([a-z0-9-]+)$#', $path, $matches)) {
+        $post = query_one("SELECT * FROM blog_posts WHERE slug = ? AND status = 'published' AND published_at <= NOW() LIMIT 1", [$matches[1]]);
+        if (!$post) {
+            public_not_found();
+            return;
+        }
+        $related = query_all("SELECT * FROM blog_posts WHERE status = 'published' AND published_at <= NOW() AND id <> ? ORDER BY published_at DESC LIMIT 3", [$post['id']]);
+        render('public/blog-detail', [
+            'post' => $post,
+            'related' => $related,
+            'title' => $post['seo_title'] ?: $post['title'],
+            'description' => $post['seo_description'] ?: $post['excerpt'],
+            'ogImage' => $post['cover_image'],
+            'ogImageAlt' => $post['cover_alt'],
         ]);
         return;
     }
@@ -280,6 +323,43 @@ function submit_contact(): void
     clear_old();
     flash('success', 'Your message has been received. We will respond using the contact details you provided.');
     redirect('/contact?sent=1');
+}
+
+function submit_public_testimonial(): void
+{
+    verify_csrf();
+    if (!is_honeypot_clean()) {
+        redirect('/testimonials?sent=1');
+    }
+    if ((string) setting('testimonial_submissions_enabled', '1') !== '1') {
+        flash('error', 'Public testimonial submissions are currently paused.');
+        redirect('/testimonials');
+    }
+    if (form_rate_limited('testimonial')) {
+        flash('error', 'Please wait a moment before submitting another testimonial.');
+        redirect('/testimonials');
+    }
+    store_old($_POST);
+    $name = trim((string) ($_POST['client_name'] ?? ''));
+    $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+    $quote = trim((string) ($_POST['quote'] ?? ''));
+    if ($name === '' || mb_strlen($name) > 190 || !filter_var($email, FILTER_VALIDATE_EMAIL)
+        || mb_strlen($quote) < 20 || mb_strlen($quote) > 1000 || empty($_POST['consent'])) {
+        flash('error', 'Add your name, a valid email, a testimonial of 20–1000 characters, and confirm consent.');
+        redirect('/testimonials');
+    }
+    $autoApprove = (string) setting('testimonial_auto_approve', '0') === '1';
+    $approvalStatus = $autoApprove ? 'approved' : 'pending';
+    $sortOrder = (int) query_value('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM testimonials');
+    db()->prepare(
+        'INSERT INTO testimonials (client_name, submitter_email, quote, source, approval_status, consented_at, sort_order, is_visible, reviewed_at) '
+        . "VALUES (?, ?, ?, 'public', ?, NOW(), ?, ?, ?)"
+    )->execute([$name, $email, $quote, $approvalStatus, $sortOrder, $autoApprove ? 1 : 0, $autoApprove ? date('Y-m-d H:i:s') : null]);
+    clear_old();
+    flash('success', $autoApprove
+        ? 'Thank you for sharing your story. Your testimonial is now visible.'
+        : 'Thank you for sharing your story. An administrator will review it before it appears publicly.');
+    redirect('/testimonials?sent=1');
 }
 
 function appointment_availability_context(): array
@@ -1165,12 +1245,15 @@ function send_grant_confirmation(int $grantId, string $code, string $name, strin
 function public_sitemap(): void
 {
     header('Content-Type: application/xml; charset=UTF-8');
-    $paths = ['', 'about', 'services', 'events', 'fiyff-foundation', 'community', 'contact', 'appointment', 'privacy'];
+    $paths = ['', 'about', 'services', 'events', 'blog', 'testimonials', 'fiyff-foundation', 'community', 'contact', 'appointment', 'privacy'];
     foreach (query_all("SELECT slug FROM services WHERE status = 'published'") as $item) {
         $paths[] = 'services/' . $item['slug'];
     }
     foreach (query_all("SELECT slug FROM events WHERE status = 'published'") as $item) {
         $paths[] = 'events/' . $item['slug'];
+    }
+    foreach (query_all("SELECT slug FROM blog_posts WHERE status = 'published' AND published_at <= NOW()") as $item) {
+        $paths[] = 'blog/' . $item['slug'];
     }
     foreach (query_all("SELECT slug FROM grant_forms WHERE status = 'published'") as $item) {
         $paths[] = 'grants/' . $item['slug'] . '/apply';

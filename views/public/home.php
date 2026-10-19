@@ -152,6 +152,7 @@
                     <button class="carousel-button" data-testimonial-prev aria-label="Previous testimonial">←</button>
                     <button class="carousel-button" data-testimonial-next aria-label="Next testimonial">→</button>
                 </div>
+                <a class="text-link mt-7 inline-flex" href="<?= e(url('/testimonials')) ?>">Read or share a testimonial →</a>
             </div>
             <div class="testimonial-stage">
                 <?php foreach ($testimonials as $index => $testimonial): ?>

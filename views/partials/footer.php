@@ -14,6 +14,8 @@
                 <a href="<?= e(url('/about')) ?>">About us</a>
                 <a href="<?= e(url('/services')) ?>">Services</a>
                 <a href="<?= e(url('/events')) ?>">Events</a>
+                <a href="<?= e(url('/blog')) ?>">Blog</a>
+                <a href="<?= e(url('/testimonials')) ?>">Testimonials</a>
                 <a href="<?= e(url('/community')) ?>">Communities</a>
                 <a href="<?= e(url('/privacy')) ?>">Privacy</a>
             </nav>

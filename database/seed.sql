@@ -6,7 +6,7 @@ ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 INSERT INTO roles (name, slug, description, is_system, is_super) VALUES
 ('Super Administrator', 'super-administrator', 'Unrestricted access to every administration feature, including users and roles.', 1, 1),
-('Content Manager', 'content-manager', 'Manages public content, services, events, hero slides, and testimonials.', 1, 0),
+('Content Manager', 'content-manager', 'Manages public content, services, events, blog posts, hero slides, and testimonials.', 1, 0),
 ('Client Services', 'client-services', 'Manages enquiries, appointments, payment records, and email delivery history.', 1, 0),
 ('Grant Reviewer', 'grant-reviewer', 'Reviews and manages FIYFF grant applications.', 1, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), is_system = VALUES(is_system), is_super = VALUES(is_super);
@@ -17,6 +17,7 @@ INSERT INTO permissions (slug, name, group_name, description) VALUES
 ('services.manage', 'Manage services', 'Content', 'Create, update, publish, and delete services.'),
 ('heroes.manage', 'Manage hero slides', 'Content', 'Manage homepage hero slides and media.'),
 ('testimonials.manage', 'Manage testimonials', 'Content', 'Create, update, show, and hide testimonials.'),
+('blog.manage', 'Manage blog posts', 'Content', 'Create, update, publish, and delete blog posts.'),
 ('content.manage', 'Manage page content', 'Content', 'Edit managed page sections and supporting media.'),
 ('grants.manage', 'Manage grant forms and applications', 'Programs', 'Create grant forms, review applications, access protected documents, and assign reviewers.'),
 ('contacts.manage', 'Manage contact submissions', 'Client Services', 'Read, archive, and delete contact submissions.'),
@@ -34,7 +35,7 @@ WHERE a.email = 'admin@embchronicles.com';
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
 WHERE r.slug = 'content-manager' AND p.slug IN
-('dashboard.view','events.manage','services.manage','heroes.manage','testimonials.manage','content.manage');
+('dashboard.view','events.manage','services.manage','heroes.manage','testimonials.manage','blog.manage','content.manage');
 
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
@@ -89,7 +90,10 @@ INSERT INTO site_settings (`key`, `value`, `type`) VALUES
 ('paystack_secret_key', '', 'secret'),
 ('paystack_currency', 'NGN', 'text'),
 ('appointment_fee', '0.00', 'money'),
-('appointment_types_migration', '1', 'boolean')
+('appointment_types_migration', '1', 'boolean'),
+('testimonial_submissions_enabled', '1', 'boolean'),
+('testimonial_auto_approve', '0', 'boolean'),
+('content_features_migration', '1', 'boolean')
 ON DUPLICATE KEY UPDATE
 `value` = IF(
   site_settings.`key` IN (
@@ -97,7 +101,8 @@ ON DUPLICATE KEY UPDATE
     'smtp_from_email','smtp_from_name','smtp_reply_to','smtp_admin_email','email_confirmations_enabled',
     'paystack_enabled','paystack_public_key','paystack_secret_key','paystack_currency','appointment_fee',
     'appointment_booking_enabled','appointment_booking_window_days','appointment_min_notice_hours','appointment_daily_limit',
-    'maintenance_enabled','maintenance_title','maintenance_message','maintenance_end_at','deployment_status_message','deployment_status_url'
+    'maintenance_enabled','maintenance_title','maintenance_message','maintenance_end_at','deployment_status_message','deployment_status_url',
+    'testimonial_submissions_enabled','testimonial_auto_approve'
   ),
   site_settings.`value`,
   VALUES(`value`)

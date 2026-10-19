@@ -64,8 +64,9 @@ Every public-facing image can be replaced or removed from the admin panel:
 - **Hero slides** manages homepage hero images.
 - **Page content** manages the homepage welcome image, both About page images, and the FIYFF hero image.
 - **Services** manages service covers and gallery images.
-- **Events** manages event and grant covers and gallery images.
-- **Testimonials** manages client photos.
+- **Events** manages event and grant covers and multi-image galleries.
+- **Blog** manages article cover images, content, publishing schedules, and SEO details.
+- **Testimonials** manages client photos, public submissions, and moderation.
 - **Site settings** manages the header logo and default social sharing image.
 
 Image fields accept a JPG, PNG, or WebP upload, a local `/uploads/...` path, or a full external URL. Add descriptive alt text whenever an image is present. Removing an image also removes its alt text; removing a hero image deactivates that slide.
@@ -79,7 +80,7 @@ Open **Admin → Administrators** to create accounts, activate or deactivate acc
 Open **Admin → Roles & access** to create roles and select the admin areas they may use. Starter roles include:
 
 - Super Administrator — unrestricted access, including users and roles;
-- Content Manager — events, services, hero slides, testimonials, and page content;
+- Content Manager — events, services, blog posts, hero slides, testimonials, and page content;
 - Client Services — contacts, appointments, payment history, and email logs;
 - Grant Reviewer — FIYFF grant applications.
 
@@ -142,7 +143,13 @@ Open **Admin → Availability** to enable or pause online booking, set the futur
 
 ## CSV import and export
 
-Open **Admin → Import / export** to transfer services, events, testimonials, newsletter subscribers, and grant applications. Available datasets follow the administrator's existing permissions. Export a fresh CSV before editing so the required headers stay intact. Imports are limited to 5 MB, update matching records, and roll back completely if any row is invalid. Grant exports exclude protected application documents.
+Open **Admin → Import / export** to transfer services, events, blog posts, testimonials, newsletter subscribers, and grant applications. Available datasets follow the administrator's existing permissions. Export a fresh CSV before editing so the required headers stay intact. Imports are limited to 5 MB, update matching records where the dataset has a stable unique key, and roll back completely if any row is invalid. Grant exports exclude protected application documents.
+
+## Blog and testimonial moderation
+
+Open **Admin → Blog** to create drafts, schedule or publish articles, feature selected posts, and configure per-article search and social metadata. Published articles appear at `/blog`.
+
+Visitors can read and submit testimonials at `/testimonials`. Open **Admin → Testimonials** to pause public submissions, require manual approval, or automatically approve new submissions. Pending and rejected testimonials never appear publicly; approved testimonials can still be hidden independently.
 
 ## Maintenance and deployment messaging
 

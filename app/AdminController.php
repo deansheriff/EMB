@@ -23,6 +23,7 @@ function admin_dispatch(string $path): void
         '/admin/services' => 'services.manage',
         '/admin/hero-slides' => 'heroes.manage',
         '/admin/testimonials' => 'testimonials.manage',
+        '/admin/blog' => 'blog.manage',
         '/admin/settings' => 'settings.manage',
         '/admin/contact-submissions' => 'contacts.manage',
         '/admin/appointments' => 'appointments.manage',
@@ -38,7 +39,7 @@ function admin_dispatch(string $path): void
     if (isset($routePermissions[$path])) {
         require_permission($routePermissions[$path]);
     }
-    if ($path === '/admin/data-tools' && !can_any(['services.manage', 'events.manage', 'testimonials.manage', 'contacts.manage', 'grants.manage'])) {
+    if ($path === '/admin/data-tools' && !can_any(['services.manage', 'events.manage', 'testimonials.manage', 'blog.manage', 'contacts.manage', 'grants.manage'])) {
         http_response_code(403);
         render('errors/403', ['title' => 'Access denied'], 'admin');
         return;
@@ -65,6 +66,9 @@ function admin_dispatch(string $path): void
             return;
         case '/admin/testimonials':
             admin_testimonials();
+            return;
+        case '/admin/blog':
+            admin_blog();
             return;
         case '/admin/settings':
             admin_settings();
@@ -140,6 +144,12 @@ function admin_dashboard(): void
     if (can('events.manage')) {
         $metrics[] = ['Total events', (int) query_value('SELECT COUNT(*) FROM events'), '/admin/events', 'berry'];
         $metrics[] = ['Featured events', (int) query_value("SELECT COUNT(*) FROM events WHERE is_featured = 1 AND status = 'published'"), '/admin/events', 'amber'];
+    }
+    if (can('blog.manage')) {
+        $metrics[] = ['Published blog posts', (int) query_value("SELECT COUNT(*) FROM blog_posts WHERE status = 'published' AND published_at <= NOW()"), '/admin/blog', 'sage'];
+    }
+    if (can('testimonials.manage')) {
+        $metrics[] = ['Testimonials awaiting review', (int) query_value("SELECT COUNT(*) FROM testimonials WHERE approval_status = 'pending'"), '/admin/testimonials', 'amber'];
     }
     if (can('contacts.manage')) {
         $metrics[] = ['Unread contacts', (int) query_value('SELECT COUNT(*) FROM contact_submissions WHERE is_read = 0 AND is_archived = 0'), '/admin/contact-submissions?filter=unread', 'berry'];
@@ -332,6 +342,7 @@ function save_gallery(string $type, int $parentId, ?array $files, array|string $
     }
     $table = $type === 'event' ? 'event_media' : 'service_media';
     $foreign = $type === 'event' ? 'event_id' : 'service_id';
+    $nextSort = (int) query_value("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM {$table} WHERE {$foreign} = ?", [$parentId]);
     foreach ($files['name'] as $index => $name) {
         if ($name === '') {
             continue;
@@ -350,7 +361,7 @@ function save_gallery(string $type, int $parentId, ?array $files, array|string $
         try {
             $media = MediaUploader::store($file, $alt);
             $stmt = db()->prepare("INSERT INTO {$table} ({$foreign}, image_path, alt_text, responsive_json, sort_order) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$parentId, $media['path'], $alt, json_encode($media['variants']), $index]);
+            $stmt->execute([$parentId, $media['path'], $alt, json_encode($media['variants']), $nextSort + $index]);
         } catch (RuntimeException $exception) {
             flash('error', 'Gallery image skipped: ' . $exception->getMessage());
         }
@@ -432,8 +443,20 @@ function admin_testimonials(): void
 {
     if (is_post()) {
         verify_csrf();
+        $action = (string) ($_POST['action'] ?? 'save');
+        if ($action === 'save_settings') {
+            $stmt = db()->prepare(
+                'INSERT INTO site_settings (`key`, `value`, `type`) VALUES (?, ?, ?) '
+                . 'ON DUPLICATE KEY UPDATE `value`=VALUES(`value`), `type`=VALUES(`type`)'
+            );
+            $stmt->execute(['testimonial_submissions_enabled', isset($_POST['testimonial_submissions_enabled']) ? '1' : '0', 'boolean']);
+            $stmt->execute(['testimonial_auto_approve', isset($_POST['testimonial_auto_approve']) ? '1' : '0', 'boolean']);
+            audit('save_settings', 'testimonial', null);
+            flash('success', 'Public testimonial settings saved.');
+            redirect('/admin/testimonials');
+        }
         $id = (int) ($_POST['id'] ?? 0);
-        if (($_POST['action'] ?? 'save') === 'delete') {
+        if ($action === 'delete') {
             db()->prepare('DELETE FROM testimonials WHERE id = ?')->execute([$id]);
             audit('delete', 'testimonial', $id);
             flash('success', 'Testimonial deleted.');
@@ -463,29 +486,125 @@ function admin_testimonials(): void
         if ($photo === '') {
             $alt = '';
         }
+        $approvalStatus = in_array(($_POST['approval_status'] ?? 'approved'), ['pending', 'approved', 'rejected'], true)
+            ? (string) $_POST['approval_status']
+            : 'pending';
+        $isVisible = $approvalStatus === 'approved' && isset($_POST['is_visible']) ? 1 : 0;
         $values = [
             trim((string) ($_POST['client_name'] ?? '')), $photo, $alt,
             trim((string) ($_POST['quote'] ?? '')), (int) ($_POST['sort_order'] ?? 0),
-            isset($_POST['is_visible']) ? 1 : 0,
+            $isVisible, $approvalStatus,
         ];
-        if ($values[0] === '' || $values[3] === '') {
-            flash('error', 'Client name and quote are required.');
+        if ($values[0] === '' || mb_strlen($values[0]) > 190 || $values[3] === '' || mb_strlen($values[3]) > 1000) {
+            flash('error', 'Client name is required and the testimonial must be 1–1000 characters.');
             redirect('/admin/testimonials' . ($id ? '?edit=' . $id : ''));
         }
         if ($id) {
+            $adminId = (int) (auth_user()['id'] ?? 0);
             $values[] = $id;
-            db()->prepare('UPDATE testimonials SET client_name=?, photo_path=?, photo_alt=?, quote=?, sort_order=?, is_visible=? WHERE id=?')->execute($values);
+            db()->prepare('UPDATE testimonials SET client_name=?, photo_path=?, photo_alt=?, quote=?, sort_order=?, is_visible=?, approval_status=?, reviewed_by=?, reviewed_at=NOW() WHERE id=?')
+                ->execute(array_merge(array_slice($values, 0, 7), [$adminId ?: null, $id]));
         } else {
-            db()->prepare('INSERT INTO testimonials (client_name, photo_path, photo_alt, quote, sort_order, is_visible) VALUES (?,?,?,?,?,?)')->execute($values);
+            db()->prepare("INSERT INTO testimonials (client_name, photo_path, photo_alt, quote, sort_order, is_visible, approval_status, source, reviewed_by, reviewed_at) VALUES (?,?,?,?,?,?,?,'admin',?,NOW())")
+                ->execute(array_merge($values, [(int) (auth_user()['id'] ?? 0) ?: null]));
             $id = (int) db()->lastInsertId();
         }
         audit('save', 'testimonial', $id);
         flash('success', 'Testimonial saved.');
         redirect('/admin/testimonials?edit=' . $id);
     }
-    $testimonials = query_all('SELECT * FROM testimonials ORDER BY sort_order, id');
+    $testimonials = query_all("SELECT * FROM testimonials ORDER BY FIELD(approval_status, 'pending', 'approved', 'rejected'), sort_order, id DESC");
     $editing = !empty($_GET['edit']) ? query_one('SELECT * FROM testimonials WHERE id = ?', [(int) $_GET['edit']]) : null;
-    render('admin/testimonials', compact('testimonials', 'editing') + ['title' => 'Testimonials'], 'admin');
+    $testimonialSettings = [
+        'enabled' => (string) setting('testimonial_submissions_enabled', '1') === '1',
+        'auto_approve' => (string) setting('testimonial_auto_approve', '0') === '1',
+    ];
+    render('admin/testimonials', compact('testimonials', 'editing', 'testimonialSettings') + ['title' => 'Testimonials'], 'admin');
+}
+
+function admin_blog(): void
+{
+    if (is_post()) {
+        verify_csrf();
+        $id = (int) ($_POST['id'] ?? 0);
+        $action = (string) ($_POST['action'] ?? 'save');
+        if ($action === 'delete') {
+            db()->prepare('DELETE FROM blog_posts WHERE id = ?')->execute([$id]);
+            audit('delete', 'blog_post', $id);
+            flash('success', 'Blog post deleted.');
+            redirect('/admin/blog');
+        }
+        $title = trim((string) ($_POST['title'] ?? ''));
+        $excerpt = trim((string) ($_POST['excerpt'] ?? ''));
+        $content = trim((string) ($_POST['content'] ?? ''));
+        if ($title === '' || $excerpt === '' || $content === '') {
+            flash('error', 'Title, excerpt, and article content are required.');
+            redirect('/admin/blog' . ($id ? '?edit=' . $id : '?new=1'));
+        }
+        $existing = $id ? query_one('SELECT * FROM blog_posts WHERE id = ?', [$id]) : null;
+        $cover = $existing['cover_image'] ?? '';
+        $coverAlt = trim((string) ($_POST['cover_alt'] ?? ($existing['cover_alt'] ?? '')));
+        if (!empty($_POST['remove_cover'])) {
+            $cover = '';
+            $coverAlt = '';
+        } elseif (!empty($_FILES['cover_image']['name'])) {
+            try {
+                $media = MediaUploader::store($_FILES['cover_image'], $coverAlt);
+                $cover = $media['path'];
+                $coverAlt = $media['alt_text'];
+            } catch (RuntimeException $exception) {
+                flash('error', $exception->getMessage());
+                redirect('/admin/blog' . ($id ? '?edit=' . $id : '?new=1'));
+            }
+        } elseif (array_key_exists('cover_url', $_POST)) {
+            $cover = trim((string) $_POST['cover_url']);
+        }
+        if ($cover !== '' && $coverAlt === '') {
+            flash('error', 'Cover image alt text is required when an image is used.');
+            redirect('/admin/blog' . ($id ? '?edit=' . $id : '?new=1'));
+        }
+        $status = ($_POST['status'] ?? 'draft') === 'published' ? 'published' : 'draft';
+        $publishedAt = trim((string) ($_POST['published_at'] ?? ''));
+        if ($publishedAt !== '') {
+            try {
+                $publishedAt = (new DateTimeImmutable($publishedAt))->format('Y-m-d H:i:s');
+            } catch (Throwable) {
+                flash('error', 'Enter a valid publication date and time.');
+                redirect('/admin/blog' . ($id ? '?edit=' . $id : '?new=1'));
+            }
+        } elseif ($status === 'published') {
+            $publishedAt = $existing['published_at'] ?? date('Y-m-d H:i:s');
+        } else {
+            $publishedAt = null;
+        }
+        $values = [
+            $title, slugify(trim((string) ($_POST['slug'] ?? '')) ?: $title), $excerpt, $content,
+            $cover ?: null, $coverAlt ?: null, trim((string) ($_POST['author_name'] ?? 'Emb Chronicles')),
+            isset($_POST['is_featured']) ? 1 : 0, $status, $publishedAt,
+            trim((string) ($_POST['seo_title'] ?? '')), trim((string) ($_POST['seo_description'] ?? '')),
+        ];
+        try {
+            if ($id) {
+                $values[] = $id;
+                db()->prepare('UPDATE blog_posts SET title=?, slug=?, excerpt=?, content=?, cover_image=?, cover_alt=?, author_name=?, is_featured=?, status=?, published_at=?, seo_title=?, seo_description=? WHERE id=?')->execute($values);
+            } else {
+                db()->prepare('INSERT INTO blog_posts (title, slug, excerpt, content, cover_image, cover_alt, author_name, is_featured, status, published_at, seo_title, seo_description) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')->execute($values);
+                $id = (int) db()->lastInsertId();
+            }
+        } catch (PDOException $exception) {
+            if ($exception->getCode() === '23000') {
+                flash('error', 'That blog slug is already in use. Choose another slug.');
+                redirect('/admin/blog' . ($id ? '?edit=' . $id : '?new=1'));
+            }
+            throw $exception;
+        }
+        audit('save', 'blog_post', $id);
+        flash('success', 'Blog post saved.');
+        redirect('/admin/blog?edit=' . $id);
+    }
+    $posts = query_all('SELECT * FROM blog_posts ORDER BY COALESCE(published_at, created_at) DESC');
+    $editing = !empty($_GET['edit']) ? query_one('SELECT * FROM blog_posts WHERE id = ?', [(int) $_GET['edit']]) : null;
+    render('admin/blog', compact('posts', 'editing') + ['title' => 'Blog'], 'admin');
 }
 
 function admin_settings(): void

@@ -16,11 +16,17 @@ function data_transfer_catalog(): array
             'description' => 'Event details, schedule, location, cover, featured status, and SEO fields.',
             'headers' => ['title', 'slug', 'excerpt', 'description', 'event_date', 'event_end', 'timezone', 'location_mode', 'location', 'event_type', 'external_link', 'cover_image', 'cover_alt', 'is_featured', 'status', 'seo_title', 'seo_description'],
         ],
+        'blog' => [
+            'label' => 'Blog posts',
+            'permission' => 'blog.manage',
+            'description' => 'Article content, covers, publishing schedules, featured status, and SEO fields.',
+            'headers' => ['title', 'slug', 'excerpt', 'content', 'cover_image', 'cover_alt', 'author_name', 'is_featured', 'status', 'published_at', 'seo_title', 'seo_description'],
+        ],
         'testimonials' => [
             'label' => 'Testimonials',
             'permission' => 'testimonials.manage',
-            'description' => 'Client names, quotes, photos, visibility, and ordering.',
-            'headers' => ['client_name', 'photo_path', 'photo_alt', 'quote', 'sort_order', 'is_visible'],
+            'description' => 'Client names, quotes, contact details, moderation status, visibility, and ordering.',
+            'headers' => ['client_name', 'submitter_email', 'photo_path', 'photo_alt', 'quote', 'source', 'approval_status', 'sort_order', 'is_visible'],
         ],
         'subscribers' => [
             'label' => 'Newsletter subscribers',
@@ -55,7 +61,8 @@ function export_data_csv(string $type): never
     $rows = match ($type) {
         'services' => query_all('SELECT title, slug, excerpt, description, cover_image, cover_alt, sort_order, is_pinned, status, seo_title, seo_description FROM services ORDER BY sort_order, id'),
         'events' => query_all('SELECT title, slug, excerpt, description, event_date, event_end, timezone, location_mode, location, event_type, external_link, cover_image, cover_alt, is_featured, status, seo_title, seo_description FROM events ORDER BY event_date, id'),
-        'testimonials' => query_all('SELECT client_name, photo_path, photo_alt, quote, sort_order, is_visible FROM testimonials ORDER BY sort_order, id'),
+        'blog' => query_all('SELECT title, slug, excerpt, content, cover_image, cover_alt, author_name, is_featured, status, published_at, seo_title, seo_description FROM blog_posts ORDER BY COALESCE(published_at, created_at) DESC'),
+        'testimonials' => query_all('SELECT client_name, submitter_email, photo_path, photo_alt, quote, source, approval_status, sort_order, is_visible FROM testimonials ORDER BY sort_order, id'),
         'subscribers' => query_all('SELECT email, consented_at, created_at FROM newsletter_subscribers ORDER BY created_at DESC'),
         'applications' => query_all(
             'SELECT ga.applicant_code, e.slug AS event_slug, gf.slug AS form_slug, ga.full_name, ga.email, ga.phone, ga.location,
@@ -156,11 +163,28 @@ function import_data_row(string $type, array $row, int $line): void
     switch ($type) {
         case 'services': import_service_row($row, $line); break;
         case 'events': import_event_row($row, $line); break;
+        case 'blog': import_blog_row($row, $line); break;
         case 'testimonials': import_testimonial_row($row, $line); break;
         case 'subscribers': import_subscriber_row($row, $line); break;
         case 'applications': import_application_row($row, $line); break;
         default: throw new RuntimeException('Unsupported data type.');
     }
+}
+
+function import_blog_row(array $row, int $line): void
+{
+    csv_require($row, ['title', 'excerpt', 'content'], $line);
+    $slug = slugify($row['slug'] ?: $row['title']);
+    $status = $row['status'] === 'published' ? 'published' : 'draft';
+    $publishedAt = csv_datetime($row['published_at'], $line, true);
+    if ($status === 'published' && $publishedAt === null) {
+        $publishedAt = date('Y-m-d H:i:s');
+    }
+    db()->prepare(
+        'INSERT INTO blog_posts (title, slug, excerpt, content, cover_image, cover_alt, author_name, is_featured, status, published_at, seo_title, seo_description)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE title=VALUES(title), excerpt=VALUES(excerpt), content=VALUES(content), cover_image=VALUES(cover_image), cover_alt=VALUES(cover_alt), author_name=VALUES(author_name), is_featured=VALUES(is_featured), status=VALUES(status), published_at=VALUES(published_at), seo_title=VALUES(seo_title), seo_description=VALUES(seo_description)'
+    )->execute([$row['title'], $slug, $row['excerpt'], $row['content'], $row['cover_image'], $row['cover_alt'], $row['author_name'] ?: 'Emb Chronicles', csv_bool($row['is_featured']), $status, $publishedAt, $row['seo_title'], $row['seo_description']]);
 }
 
 function import_service_row(array $row, int $line): void
@@ -191,11 +215,16 @@ function import_event_row(array $row, int $line): void
 function import_testimonial_row(array $row, int $line): void
 {
     csv_require($row, ['client_name', 'quote'], $line);
+    $source = in_array($row['source'], ['admin', 'public'], true) ? $row['source'] : 'admin';
+    $approvalStatus = in_array($row['approval_status'], ['pending', 'approved', 'rejected'], true) ? $row['approval_status'] : 'pending';
+    $isVisible = $approvalStatus === 'approved' ? csv_bool($row['is_visible']) : 0;
+    if ($row['submitter_email'] !== '' && !filter_var($row['submitter_email'], FILTER_VALIDATE_EMAIL)) {
+        throw new RuntimeException('Row ' . $line . ' contains an invalid testimonial email address.');
+    }
     db()->prepare(
-        'INSERT INTO testimonials (client_name, photo_path, photo_alt, quote, sort_order, is_visible)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE photo_path=VALUES(photo_path), photo_alt=VALUES(photo_alt), quote=VALUES(quote), sort_order=VALUES(sort_order), is_visible=VALUES(is_visible)'
-    )->execute([$row['client_name'], $row['photo_path'], $row['photo_alt'], $row['quote'], (int) $row['sort_order'], csv_bool($row['is_visible'])]);
+        'INSERT INTO testimonials (client_name, submitter_email, photo_path, photo_alt, quote, source, approval_status, sort_order, is_visible)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )->execute([$row['client_name'], strtolower($row['submitter_email']), $row['photo_path'], $row['photo_alt'], $row['quote'], $source, $approvalStatus, (int) $row['sort_order'], $isVisible]);
 }
 
 function import_subscriber_row(array $row, int $line): void

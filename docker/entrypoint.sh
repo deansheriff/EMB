@@ -89,6 +89,12 @@ if [ "${DB_BOOTSTRAP:-true}" = "true" ]; then
     echo "Adding database-backed appointment types and prices."
     run_sql_file /var/www/html/database/migrations/20260803_appointment_types.sql
   fi
+
+  content_features_migration_count="$(mysql_command --batch --skip-column-names --execute="SELECT COUNT(*) FROM site_settings WHERE \`key\` = 'content_features_migration' AND \`value\` = '1'")"
+  if [ "${content_features_migration_count}" = "0" ]; then
+    echo "Adding blog publishing and public testimonial moderation."
+    run_sql_file /var/www/html/database/migrations/20261019_content_features.sql
+  fi
 fi
 
 exec "$@"

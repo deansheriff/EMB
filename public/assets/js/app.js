@@ -272,6 +272,30 @@
     button.textContent = input.type === "password" ? "Show" : "Hide";
   }));
 
+  qsa("[data-gallery-uploader]").forEach((uploader) => {
+    const input = qs("[data-gallery-input]", uploader);
+    const altList = qs("[data-gallery-alt-list]", uploader);
+    if (!input || !altList) return;
+    input.addEventListener("change", () => {
+      altList.replaceChildren();
+      Array.from(input.files || []).forEach((file, index) => {
+        const field = document.createElement("label");
+        field.className = "form-field rounded-xl border border-line bg-ivory p-4";
+        const title = document.createElement("span");
+        title.className = "block truncate text-sm font-bold text-wine";
+        title.textContent = `${index + 1}. ${file.name}`;
+        const alt = document.createElement("input");
+        alt.className = "form-control mt-2";
+        alt.name = "gallery_alt[]";
+        alt.maxLength = 255;
+        alt.required = true;
+        alt.placeholder = "Describe what is shown in this image";
+        field.append(title, alt);
+        altList.append(field);
+      });
+    });
+  });
+
   const appointmentTypeOptions = qsa("[data-appointment-type-option]");
   if (appointmentTypeOptions.length) {
     const priceOutput = qs("[data-appointment-price]");
