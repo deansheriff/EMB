@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/app/bootstrap.php';
 
+$migrationSql = (string) file_get_contents(dirname(__DIR__) . '/database/migrations/20261019_content_features.sql');
+if (preg_match('/ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS/i', $migrationSql)) {
+    throw new RuntimeException('The content migration uses ADD COLUMN IF NOT EXISTS, which is not supported by MySQL.');
+}
+
 $requiredBlogColumns = ['title', 'slug', 'excerpt', 'content', 'status', 'published_at'];
 $blogColumns = query_all(
     "SELECT column_name FROM information_schema.columns

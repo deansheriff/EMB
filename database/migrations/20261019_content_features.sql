@@ -18,13 +18,83 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   INDEX idx_blog_featured (status, is_featured, published_at)
 ) ENGINE=InnoDB;
 
-ALTER TABLE testimonials
-  ADD COLUMN IF NOT EXISTS submitter_email VARCHAR(190) NULL AFTER client_name,
-  ADD COLUMN IF NOT EXISTS source ENUM('admin','public') NOT NULL DEFAULT 'admin' AFTER quote,
-  ADD COLUMN IF NOT EXISTS approval_status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved' AFTER source,
-  ADD COLUMN IF NOT EXISTS consented_at DATETIME NULL AFTER approval_status,
-  ADD COLUMN IF NOT EXISTS reviewed_by BIGINT UNSIGNED NULL AFTER consented_at,
-  ADD COLUMN IF NOT EXISTS reviewed_at DATETIME NULL AFTER reviewed_by;
+SET @testimonial_column_exists = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'testimonials' AND column_name = 'submitter_email'
+);
+SET @testimonial_column_sql = IF(
+  @testimonial_column_exists = 0,
+  'ALTER TABLE testimonials ADD COLUMN submitter_email VARCHAR(190) NULL AFTER client_name',
+  'SELECT 1'
+);
+PREPARE testimonial_column_statement FROM @testimonial_column_sql;
+EXECUTE testimonial_column_statement;
+DEALLOCATE PREPARE testimonial_column_statement;
+
+SET @testimonial_column_exists = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'testimonials' AND column_name = 'source'
+);
+SET @testimonial_column_sql = IF(
+  @testimonial_column_exists = 0,
+  'ALTER TABLE testimonials ADD COLUMN source ENUM(''admin'',''public'') NOT NULL DEFAULT ''admin'' AFTER quote',
+  'SELECT 1'
+);
+PREPARE testimonial_column_statement FROM @testimonial_column_sql;
+EXECUTE testimonial_column_statement;
+DEALLOCATE PREPARE testimonial_column_statement;
+
+SET @testimonial_column_exists = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'testimonials' AND column_name = 'approval_status'
+);
+SET @testimonial_column_sql = IF(
+  @testimonial_column_exists = 0,
+  'ALTER TABLE testimonials ADD COLUMN approval_status ENUM(''pending'',''approved'',''rejected'') NOT NULL DEFAULT ''approved'' AFTER source',
+  'SELECT 1'
+);
+PREPARE testimonial_column_statement FROM @testimonial_column_sql;
+EXECUTE testimonial_column_statement;
+DEALLOCATE PREPARE testimonial_column_statement;
+
+SET @testimonial_column_exists = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'testimonials' AND column_name = 'consented_at'
+);
+SET @testimonial_column_sql = IF(
+  @testimonial_column_exists = 0,
+  'ALTER TABLE testimonials ADD COLUMN consented_at DATETIME NULL AFTER approval_status',
+  'SELECT 1'
+);
+PREPARE testimonial_column_statement FROM @testimonial_column_sql;
+EXECUTE testimonial_column_statement;
+DEALLOCATE PREPARE testimonial_column_statement;
+
+SET @testimonial_column_exists = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'testimonials' AND column_name = 'reviewed_by'
+);
+SET @testimonial_column_sql = IF(
+  @testimonial_column_exists = 0,
+  'ALTER TABLE testimonials ADD COLUMN reviewed_by BIGINT UNSIGNED NULL AFTER consented_at',
+  'SELECT 1'
+);
+PREPARE testimonial_column_statement FROM @testimonial_column_sql;
+EXECUTE testimonial_column_statement;
+DEALLOCATE PREPARE testimonial_column_statement;
+
+SET @testimonial_column_exists = (
+  SELECT COUNT(*) FROM information_schema.columns
+  WHERE table_schema = DATABASE() AND table_name = 'testimonials' AND column_name = 'reviewed_at'
+);
+SET @testimonial_column_sql = IF(
+  @testimonial_column_exists = 0,
+  'ALTER TABLE testimonials ADD COLUMN reviewed_at DATETIME NULL AFTER reviewed_by',
+  'SELECT 1'
+);
+PREPARE testimonial_column_statement FROM @testimonial_column_sql;
+EXECUTE testimonial_column_statement;
+DEALLOCATE PREPARE testimonial_column_statement;
 
 SET @testimonial_name_index_exists = (
   SELECT COUNT(*) FROM information_schema.statistics
