@@ -48,7 +48,7 @@
         <div class="<?= !empty($welcomeMedia['image_path']) ? 'lg:pl-12' : 'max-w-3xl lg:col-span-2' ?>">
             <p class="eyebrow">Welcome to your beginning</p>
             <h2 class="section-heading mt-4">Welcome to EMB Chronicles</h2>
-            <div class="prose-warm mt-6"><?= page_content('home', 'welcome') ?></div>
+            <div class="prose-warm mt-6"><?= safe_html(page_content('home', 'welcome')) ?></div>
             <a class="text-link mt-7" href="<?= e(url('/about')) ?>">More about us <span>→</span></a>
         </div>
     </div>

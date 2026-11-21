@@ -95,6 +95,14 @@ if [ "${DB_BOOTSTRAP:-true}" = "true" ]; then
     echo "Adding blog publishing and public testimonial moderation."
     run_sql_file /var/www/html/database/migrations/20261019_content_features.sql
   fi
+
+  security_hardening_migration_count="$(mysql_command --batch --skip-column-names --execute="SELECT COUNT(*) FROM site_settings WHERE \`key\` = 'security_hardening_migration' AND \`value\` = '1'")"
+  if [ "${security_hardening_migration_count}" = "0" ]; then
+    echo "Adding sign-in rate limits, grant-application protection, and branding access."
+    run_sql_file /var/www/html/database/migrations/20261121_security_hardening.sql
+  fi
+
+  php /var/www/html/docker/secure-admin.php || echo "Warning: could not check the seeded administrator password." >&2
 fi
 
 exec "$@"

@@ -27,7 +27,7 @@
                 <strong class="text-wine">Important:</strong> This service provides education and guidance. It does not replace diagnosis or treatment from a licensed medical team.
             </div>
         </aside>
-        <article class="prose-warm prose-large"><?= $service['description'] ?></article>
+        <article class="prose-warm prose-large"><?= safe_html($service['description']) ?></article>
     </div>
 </section>
 

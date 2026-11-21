@@ -359,7 +359,8 @@ CREATE TABLE IF NOT EXISTS email_logs (
   error_message TEXT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_email_status (status, created_at),
-  INDEX idx_email_related (related_type, related_id)
+  INDEX idx_email_related (related_type, related_id),
+  INDEX idx_email_recipient (recipient, created_at)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS grant_applications (
@@ -382,7 +383,7 @@ CREATE TABLE IF NOT EXISTS grant_applications (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_grant_event_status (event_id, status, created_at),
-  CONSTRAINT fk_grant_event FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+  CONSTRAINT fk_grant_event FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE RESTRICT,
   CONSTRAINT fk_grant_application_form FOREIGN KEY (form_id) REFERENCES grant_forms(id) ON DELETE SET NULL,
   CONSTRAINT fk_grant_reviewer FOREIGN KEY (assigned_reviewer) REFERENCES admins(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -419,4 +420,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_audit_created (created_at),
   CONSTRAINT fk_audit_admin FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS rate_limits (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  bucket VARCHAR(60) NOT NULL,
+  key_hash CHAR(64) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_rate_limits_lookup (bucket, key_hash, created_at),
+  INDEX idx_rate_limits_created (created_at)
 ) ENGINE=InnoDB;

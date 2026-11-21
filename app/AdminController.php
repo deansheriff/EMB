@@ -25,6 +25,7 @@ function admin_dispatch(string $path): void
         '/admin/testimonials' => 'testimonials.manage',
         '/admin/blog' => 'blog.manage',
         '/admin/settings' => 'settings.manage',
+        '/admin/branding' => 'branding.manage',
         '/admin/contact-submissions' => 'contacts.manage',
         '/admin/appointments' => 'appointments.manage',
         '/admin/appointment-types' => 'appointments.manage',
@@ -73,6 +74,9 @@ function admin_dispatch(string $path): void
         case '/admin/settings':
             admin_settings();
             return;
+        case '/admin/branding':
+            admin_branding();
+            return;
         case '/admin/contact-submissions':
             admin_contacts();
             return;
@@ -119,16 +123,28 @@ function admin_login(): void
     }
     if (is_post()) {
         verify_csrf();
+        $email = (string) ($_POST['email'] ?? '');
+        $password = (string) ($_POST['password'] ?? '');
         if (form_rate_limited('admin_login', 2)) {
             flash('error', 'Please wait a moment before trying again.');
             redirect('/admin/login');
         }
-        if (attempt_login((string) ($_POST['email'] ?? ''), (string) ($_POST['password'] ?? ''))) {
+        if (login_locked_out($email)) {
+            flash('error', 'Too many failed sign-in attempts. Please wait 15 minutes and try again.');
+            redirect('/admin/login');
+        }
+        if ($password === DEFAULT_ADMIN_PASSWORD && env('APP_ENV', 'production') === 'production') {
+            record_login_failure($email);
+            flash('error', 'The default setup password is disabled in production. Set ADMIN_INITIAL_PASSWORD and redeploy, or reset the password hash in the database.');
+            redirect('/admin/login');
+        }
+        if (attempt_login($email, $password)) {
             flash('success', 'Welcome back.');
             $intended = $_SESSION['_intended'] ?? '/admin';
             unset($_SESSION['_intended']);
             redirect((string) $intended);
         }
+        record_login_failure($email);
         flash('error', 'The email or password is incorrect.');
         redirect('/admin/login');
     }
@@ -178,7 +194,20 @@ function admin_events(): void
         $action = (string) ($_POST['action'] ?? 'save');
         if ($action === 'delete') {
             $id = (int) ($_POST['id'] ?? 0);
-            db()->prepare('DELETE FROM events WHERE id = ?')->execute([$id]);
+            $applicationCount = (int) query_value('SELECT COUNT(*) FROM grant_applications WHERE event_id = ?', [$id]);
+            if ($applicationCount > 0) {
+                flash('error', 'This event has ' . $applicationCount . ' grant application' . ($applicationCount === 1 ? '' : 's') . ' and cannot be deleted. Set it to draft instead.');
+                redirect('/admin/events?edit=' . $id);
+            }
+            try {
+                db()->prepare('DELETE FROM events WHERE id = ?')->execute([$id]);
+            } catch (PDOException $exception) {
+                if ($exception->getCode() !== '23000') {
+                    throw $exception;
+                }
+                flash('error', 'This event is still linked to other records and cannot be deleted. Set it to draft instead.');
+                redirect('/admin/events?edit=' . $id);
+            }
             audit('delete', 'event', $id);
             flash('success', 'Event deleted.');
             redirect('/admin/events');
@@ -246,14 +275,22 @@ function save_event(): never
         trim((string) ($_POST['seo_title'] ?? '')),
         trim((string) ($_POST['seo_description'] ?? '')),
     ];
-    if ($id) {
-        $sql = 'UPDATE events SET title=?, slug=?, excerpt=?, description=?, event_date=?, event_end=?, timezone=?, location_mode=?, location=?, event_type=?, external_link=?, cover_image=?, cover_alt=?, is_featured=?, status=?, seo_title=?, seo_description=? WHERE id=?';
-        $values[] = $id;
-        db()->prepare($sql)->execute($values);
-    } else {
-        $sql = 'INSERT INTO events (title, slug, excerpt, description, event_date, event_end, timezone, location_mode, location, event_type, external_link, cover_image, cover_alt, is_featured, status, seo_title, seo_description) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
-        db()->prepare($sql)->execute($values);
-        $id = (int) db()->lastInsertId();
+    try {
+        if ($id) {
+            $sql = 'UPDATE events SET title=?, slug=?, excerpt=?, description=?, event_date=?, event_end=?, timezone=?, location_mode=?, location=?, event_type=?, external_link=?, cover_image=?, cover_alt=?, is_featured=?, status=?, seo_title=?, seo_description=? WHERE id=?';
+            $values[] = $id;
+            db()->prepare($sql)->execute($values);
+        } else {
+            $sql = 'INSERT INTO events (title, slug, excerpt, description, event_date, event_end, timezone, location_mode, location, event_type, external_link, cover_image, cover_alt, is_featured, status, seo_title, seo_description) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)';
+            db()->prepare($sql)->execute($values);
+            $id = (int) db()->lastInsertId();
+        }
+    } catch (PDOException $exception) {
+        if ($exception->getCode() !== '23000') {
+            throw $exception;
+        }
+        flash('error', 'Another event already uses the URL slug "' . $slug . '". Choose a different slug.');
+        redirect('/admin/events' . ($id ? '?edit=' . $id : ''));
     }
     remove_gallery_media('event', $id, $_POST['remove_gallery'] ?? []);
     save_gallery('event', $id, $_FILES['gallery'] ?? null, $_POST['gallery_alt'] ?? []);
@@ -321,12 +358,20 @@ function save_service(): never
         ($_POST['status'] ?? 'draft') === 'published' ? 'published' : 'draft',
         trim((string) ($_POST['seo_title'] ?? '')), trim((string) ($_POST['seo_description'] ?? '')),
     ];
-    if ($id) {
-        $values[] = $id;
-        db()->prepare('UPDATE services SET title=?, slug=?, excerpt=?, description=?, cover_image=?, cover_alt=?, sort_order=?, is_pinned=?, status=?, seo_title=?, seo_description=? WHERE id=?')->execute($values);
-    } else {
-        db()->prepare('INSERT INTO services (title, slug, excerpt, description, cover_image, cover_alt, sort_order, is_pinned, status, seo_title, seo_description) VALUES (?,?,?,?,?,?,?,?,?,?,?)')->execute($values);
-        $id = (int) db()->lastInsertId();
+    try {
+        if ($id) {
+            $values[] = $id;
+            db()->prepare('UPDATE services SET title=?, slug=?, excerpt=?, description=?, cover_image=?, cover_alt=?, sort_order=?, is_pinned=?, status=?, seo_title=?, seo_description=? WHERE id=?')->execute($values);
+        } else {
+            db()->prepare('INSERT INTO services (title, slug, excerpt, description, cover_image, cover_alt, sort_order, is_pinned, status, seo_title, seo_description) VALUES (?,?,?,?,?,?,?,?,?,?,?)')->execute($values);
+            $id = (int) db()->lastInsertId();
+        }
+    } catch (PDOException $exception) {
+        if ($exception->getCode() !== '23000') {
+            throw $exception;
+        }
+        flash('error', 'Another service already uses the URL slug "' . $values[1] . '". Choose a different slug.');
+        redirect('/admin/services' . ($id ? '?edit=' . $id : ''));
     }
     remove_gallery_media('service', $id, $_POST['remove_gallery'] ?? []);
     save_gallery('service', $id, $_FILES['gallery'] ?? null, $_POST['gallery_alt'] ?? []);
@@ -423,12 +468,20 @@ function admin_heroes(): void
             trim((string) ($_POST['secondary_label'] ?? '')), trim((string) ($_POST['secondary_link'] ?? '')),
             (int) ($_POST['sort_order'] ?? 0), $isActive,
         ];
-        if ($id) {
-            $values[] = $id;
-            db()->prepare('UPDATE hero_slides SET image_path=?, image_alt=?, headline=?, subheading=?, cta_label=?, cta_link=?, secondary_label=?, secondary_link=?, sort_order=?, is_active=? WHERE id=?')->execute($values);
-        } else {
-            db()->prepare('INSERT INTO hero_slides (image_path, image_alt, headline, subheading, cta_label, cta_link, secondary_label, secondary_link, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?,?)')->execute($values);
-            $id = (int) db()->lastInsertId();
+        try {
+            if ($id) {
+                $values[] = $id;
+                db()->prepare('UPDATE hero_slides SET image_path=?, image_alt=?, headline=?, subheading=?, cta_label=?, cta_link=?, secondary_label=?, secondary_link=?, sort_order=?, is_active=? WHERE id=?')->execute($values);
+            } else {
+                db()->prepare('INSERT INTO hero_slides (image_path, image_alt, headline, subheading, cta_label, cta_link, secondary_label, secondary_link, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?,?)')->execute($values);
+                $id = (int) db()->lastInsertId();
+            }
+        } catch (PDOException $exception) {
+            if ($exception->getCode() !== '23000') {
+                throw $exception;
+            }
+            flash('error', 'Another hero slide already uses that headline. Choose a different headline.');
+            redirect('/admin/hero-slides' . ($id ? '?edit=' . $id : ''));
         }
         audit('save', 'hero_slide', $id);
         flash('success', 'Hero slide saved.');
@@ -624,45 +677,7 @@ function admin_settings(): void
     $secrets = ['smtp_password', 'paystack_secret_key'];
     if (is_post()) {
         verify_csrf();
-        if (!empty($_POST['remove_logo'])) {
-            $_POST['logo_path'] = '';
-        } elseif (!empty($_FILES['logo']['name'])) {
-            try {
-                $media = MediaUploader::store($_FILES['logo'], (string) ($_POST['site_name'] ?? 'Emb Chronicles') . ' logo');
-                // Logos should retain their original alpha channel and sharp
-                // edges rather than depending on a generated photo variant.
-                $_POST['logo_path'] = $media['variants']['original'] ?? $media['path'];
-            } catch (RuntimeException $exception) {
-                flash('error', $exception->getMessage());
-                redirect('/admin/settings');
-            }
-        }
-        if (!empty($_POST['remove_social_share_image'])) {
-            $_POST['social_share_image'] = '';
-            $_POST['social_share_image_alt'] = '';
-        } elseif (!empty($_FILES['social_share_image_file']['name'])) {
-            $socialImageAlt = trim((string) ($_POST['social_share_image_alt'] ?? ''));
-            if ($socialImageAlt === '') {
-                flash('error', 'Add descriptive alt text before uploading the social sharing image.');
-                redirect('/admin/settings');
-            }
-            try {
-                $media = MediaUploader::store($_FILES['social_share_image_file'], $socialImageAlt);
-                $_POST['social_share_image'] = $media['variants']['original'] ?? $media['path'];
-            } catch (RuntimeException $exception) {
-                flash('error', $exception->getMessage());
-                redirect('/admin/settings');
-            }
-        }
-        $socialImage = trim((string) ($_POST['social_share_image'] ?? ''));
-        $socialImageAlt = trim((string) ($_POST['social_share_image_alt'] ?? ''));
-        if ($socialImage !== '' && $socialImageAlt === '') {
-            flash('error', 'Add descriptive alt text when a social sharing image is used.');
-            redirect('/admin/settings');
-        }
-        if ($socialImage === '') {
-            $_POST['social_share_image_alt'] = '';
-        }
+        process_branding_uploads('/admin/settings');
         foreach (['smtp_from_email', 'smtp_reply_to', 'smtp_admin_email'] as $emailKey) {
             $value = trim((string) ($_POST[$emailKey] ?? ''));
             if ($value !== '' && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
@@ -758,6 +773,79 @@ function admin_settings(): void
     $settings = query_all('SELECT * FROM site_settings ORDER BY `key`');
     $settings = array_column($settings, 'value', 'key');
     render('admin/settings', compact('settings') + ['title' => 'Site settings'], 'admin');
+}
+
+/**
+ * Turns logo and social-image uploads/removals into logo_path,
+ * social_share_image, and social_share_image_alt values in $_POST.
+ */
+function process_branding_uploads(string $redirectPath): void
+{
+    if (!empty($_POST['remove_logo'])) {
+        $_POST['logo_path'] = '';
+    } elseif (!empty($_FILES['logo']['name'])) {
+        try {
+            $media = MediaUploader::store($_FILES['logo'], (string) ($_POST['site_name'] ?? setting('site_name', 'Emb Chronicles')) . ' logo');
+            // Logos should retain their original alpha channel and sharp
+            // edges rather than depending on a generated photo variant.
+            $_POST['logo_path'] = $media['variants']['original'] ?? $media['path'];
+        } catch (RuntimeException $exception) {
+            flash('error', $exception->getMessage());
+            redirect($redirectPath);
+        }
+    }
+    if (!empty($_POST['remove_social_share_image'])) {
+        $_POST['social_share_image'] = '';
+        $_POST['social_share_image_alt'] = '';
+    } elseif (!empty($_FILES['social_share_image_file']['name'])) {
+        $socialImageAlt = trim((string) ($_POST['social_share_image_alt'] ?? ''));
+        if ($socialImageAlt === '') {
+            flash('error', 'Add descriptive alt text before uploading the social sharing image.');
+            redirect($redirectPath);
+        }
+        try {
+            $media = MediaUploader::store($_FILES['social_share_image_file'], $socialImageAlt);
+            $_POST['social_share_image'] = $media['variants']['original'] ?? $media['path'];
+        } catch (RuntimeException $exception) {
+            flash('error', $exception->getMessage());
+            redirect($redirectPath);
+        }
+    }
+    $socialImage = trim((string) ($_POST['social_share_image'] ?? ''));
+    $socialImageAlt = trim((string) ($_POST['social_share_image_alt'] ?? ''));
+    if ($socialImage !== '' && $socialImageAlt === '') {
+        flash('error', 'Add descriptive alt text when a social sharing image is used.');
+        redirect($redirectPath);
+    }
+    if ($socialImage === '') {
+        $_POST['social_share_image_alt'] = '';
+    }
+}
+
+function admin_branding(): void
+{
+    if (is_post()) {
+        verify_csrf();
+        process_branding_uploads('/admin/branding');
+        $stmt = db()->prepare(
+            'INSERT INTO site_settings (`key`, `value`, `type`) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `type` = VALUES(`type`)'
+        );
+        foreach (['logo_path' => 'image', 'social_share_image' => 'image', 'social_share_image_alt' => 'text'] as $key => $type) {
+            if (array_key_exists($key, $_POST)) {
+                $stmt->execute([$key, trim((string) $_POST[$key]), $type]);
+            }
+        }
+        audit('save', 'branding', null);
+        flash('success', 'Branding saved.');
+        redirect('/admin/branding');
+    }
+    $settings = array_column(
+        query_all("SELECT `key`, `value` FROM site_settings WHERE `key` IN ('site_name', 'logo_path', 'social_share_image', 'social_share_image_alt')"),
+        'value',
+        'key'
+    );
+    render('admin/branding', compact('settings') + ['title' => 'Branding'], 'admin');
 }
 
 function admin_contacts(): void

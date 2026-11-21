@@ -27,7 +27,7 @@ $aboutGuide = page_section('about', 'guide') ?: [
             <p class="eyebrow">Who we are</p>
             <h2 class="section-heading mt-4">A safe space between the clinic and the outside world</h2>
         </div>
-        <div class="prose-warm text-lg"><?= page_content('about', 'intro') ?></div>
+        <div class="prose-warm text-lg"><?= safe_html(page_content('about', 'intro')) ?></div>
     </div>
 </section>
 
@@ -39,7 +39,7 @@ $aboutGuide = page_section('about', 'guide') ?: [
         <div class="<?= !empty($aboutGuide['image_path']) ? 'lg:pl-10' : 'mx-auto max-w-3xl text-center' ?>">
             <p class="eyebrow"><?= e($aboutGuide['eyebrow'] ?: 'Meet your guide') ?></p>
             <h2 class="section-heading mt-4"><?= e($aboutGuide['heading'] ?: 'Zubaida’s dream-chasing philosophy') ?></h2>
-            <div class="prose-warm mt-6"><?= $aboutGuide['content'] ?></div>
+            <div class="prose-warm mt-6"><?= safe_html($aboutGuide['content']) ?></div>
             <a class="button button-primary mt-8" href="<?= e(url('/appointment')) ?>">Book a conversation</a>
         </div>
     </div>

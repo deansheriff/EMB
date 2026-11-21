@@ -34,6 +34,10 @@ final class Mailer
             self::log($recipient, $subject, $templateKey, 'skipped', 'SMTP is not enabled or fully configured.', $relatedType, $relatedId);
             return false;
         }
+        if (self::recipientLimitReached($recipient, $templateKey)) {
+            self::log($recipient, $subject, $templateKey, 'skipped', 'Daily limit for automatic emails to this address was reached.', $relatedType, $relatedId);
+            return false;
+        }
         if (!class_exists(PHPMailer::class)) {
             self::log($recipient, $subject, $templateKey, 'failed', 'PHPMailer is not installed.', $relatedType, $relatedId);
             return false;
@@ -77,6 +81,29 @@ final class Mailer
             return true;
         } catch (Throwable $exception) {
             self::log($recipient, $subject, $templateKey, 'failed', mb_substr($exception->getMessage(), 0, 1000), $relatedType, $relatedId);
+            return false;
+        }
+    }
+
+    /** Templates triggered by anonymous visitors, which must not be usable to flood an inbox. */
+    private const PUBLIC_TEMPLATES = ['contact_received', 'newsletter_welcome', 'appointment_received', 'grant_received'];
+    private const PUBLIC_TEMPLATE_DAILY_LIMIT = 5;
+
+    private static function recipientLimitReached(string $recipient, string $templateKey): bool
+    {
+        if (!in_array($templateKey, self::PUBLIC_TEMPLATES, true)) {
+            return false;
+        }
+        try {
+            $placeholders = implode(',', array_fill(0, count(self::PUBLIC_TEMPLATES), '?'));
+            $sent = (int) query_value(
+                "SELECT COUNT(*) FROM email_logs
+                 WHERE recipient = ? AND status = 'sent' AND template_key IN ({$placeholders})
+                   AND created_at > (NOW() - INTERVAL 1 DAY)",
+                array_merge([strtolower($recipient)], self::PUBLIC_TEMPLATES)
+            );
+            return $sent >= self::PUBLIC_TEMPLATE_DAILY_LIMIT;
+        } catch (Throwable) {
             return false;
         }
     }

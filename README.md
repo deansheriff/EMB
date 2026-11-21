@@ -24,6 +24,8 @@ Approved design source: [EMB Chronicles on Google Stitch](https://stitch.withgoo
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260801_editable_page_media.sql"
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260801_availability_maintenance.sql"
    C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20260803_appointment_types.sql"
+   C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20261019_content_features.sql"
+   C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root emb_chronicles -e "source database/migrations/20261121_security_hardening.sql"
    ```
 
 3. Install PHP and frontend dependencies, then build the stylesheet:
@@ -45,9 +47,13 @@ Approved design source: [EMB Chronicles on Google Stitch](https://stitch.withgoo
 ## Initial administrator
 
 - Email: `admin@embchronicles.com`
-- Password: `ChangeMe123!`
+- Local development password: `ChangeMe123!`
 
-Change this password immediately before the site is made public. Generate a new hash with:
+This seed password only works locally. When `APP_ENV=production` the sign-in form rejects it, and every Docker container start replaces it automatically: with `ADMIN_INITIAL_PASSWORD` when that variable is set (12+ characters), otherwise with a random temporary password printed once in the container log.
+
+Admin sign-in is limited to 5 failed attempts per email address and 20 per IP address in any 15-minute window.
+
+To reset a password by hand, generate a new hash with:
 
 ```powershell
 php -r "echo password_hash('your-new-password', PASSWORD_DEFAULT), PHP_EOL;"
@@ -80,9 +86,11 @@ Open **Admin → Administrators** to create accounts, activate or deactivate acc
 Open **Admin → Roles & access** to create roles and select the admin areas they may use. Starter roles include:
 
 - Super Administrator — unrestricted access, including users and roles;
-- Content Manager — events, services, blog posts, hero slides, testimonials, and page content;
+- Content Manager — events, services, blog posts, hero slides, testimonials, page content, and branding (site logo and social sharing image);
 - Client Services — contacts, appointments, payment history, and email logs;
 - Grant Reviewer — FIYFF grant applications.
+
+The **Manage branding** permission opens **Admin → Branding**, where the logo and default social sharing image can be changed without access to SMTP, Paystack, or other site settings. Add it to any role that should be able to change the logo.
 
 Permissions are enforced on every admin request as well as in the navigation. Administrators cannot grant permissions they do not possess, edit their own role assignment, deactivate themselves, or remove the final active super administrator.
 
@@ -125,6 +133,24 @@ When enabled, the website sends:
 
 Delivery attempts are available under **Admin → Email log**.
 
+### Default SMTP credentials
+
+The site can take its first SMTP settings from environment variables (`.env` locally, Coolify variables in production). They are copied into **Admin → Site settings** the first time the app runs with an empty SMTP host; after that the admin settings win.
+
+```text
+SMTP_ENABLED=true
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_ENCRYPTION=tls
+SMTP_USERNAME=your-brevo-smtp-login
+SMTP_PASSWORD=your-brevo-smtp-key
+# Optional: SMTP_FROM_EMAIL, SMTP_FROM_NAME, SMTP_ADMIN_EMAIL
+```
+
+The sender address (**From email**, default `info@embchronicles.com`) must be a verified sender or domain in Brevo.
+
+To stop visitors using the forms to flood an inbox, each public form is limited per IP address per hour, newsletter welcome emails go only to new subscribers, and each address receives at most 5 automatic visitor-triggered emails per day.
+
 ## Paystack appointment payments
 
 Open **Admin → Site settings → Paystack appointment payments**. Start with Paystack test public and secret keys, set the appointment fee in naira, and add this webhook URL in the Paystack dashboard:
@@ -136,6 +162,10 @@ https://your-production-domain.example/payments/paystack/webhook
 The application initializes checkout on the server, redirects clients to Paystack’s hosted checkout, verifies callbacks, validates webhook signatures, checks the exact amount and currency, and records every payment attempt. Appointments can be filtered and managed under **Admin → Appointments**.
 
 Use HTTPS and test keys until the callback, webhook, payment status, and confirmation email all work on the production domain.
+
+Default keys can be supplied as `PAYSTACK_ENABLED`, `PAYSTACK_PUBLIC_KEY`, and `PAYSTACK_SECRET_KEY` environment variables. Like SMTP, they are copied into the admin settings once, when the saved secret key is empty.
+
+An unpaid booking holds its time slot for 30 minutes. After that the slot is released to other visitors; if the client returns to pay later, the slot is rechecked before a new checkout starts.
 
 ## Appointment availability
 
@@ -184,7 +214,23 @@ DB_WAIT_TIMEOUT=60
 
 UPLOAD_MAX_MB=8
 GRANT_UPLOAD_TOTAL_MB=18
+
+ADMIN_INITIAL_PASSWORD=a-long-unique-password
+TRUST_PROXY=true
+
+SMTP_ENABLED=true
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_ENCRYPTION=tls
+SMTP_USERNAME=your-brevo-smtp-login
+SMTP_PASSWORD=your-brevo-smtp-key
+
+PAYSTACK_ENABLED=true
+PAYSTACK_PUBLIC_KEY=pk_live_...
+PAYSTACK_SECRET_KEY=sk_live_...
 ```
+
+`TRUST_PROXY=true` (the image default) reads the visitor's IP from Coolify's proxy for rate limiting. Set it to `false` only if the container is exposed directly to the internet.
 
 `DB_BOOTSTRAP=true` waits for MySQL and initializes an empty database on first startup. On later deployments it detects existing tables and skips completed initialization. Set it to `false` if database schema changes are managed separately.
 
@@ -195,7 +241,7 @@ Configure persistent storage for both paths so uploads survive deployments:
 /var/www/html/storage
 ```
 
-The container does not need SMTP or Paystack secrets as environment variables; configure them after deployment under **Admin → Site settings**. Change the seeded administrator password immediately after the first deployment.
+SMTP and Paystack variables are optional defaults; you can also configure them after deployment under **Admin → Site settings**. On every start the container replaces the seeded administrator password: with `ADMIN_INITIAL_PASSWORD` if set, otherwise with a random password printed in the deployment log.
 
 For Paystack, configure the production webhook as:
 

@@ -17,6 +17,7 @@ $nav = [
     '/admin/availability' => ['Availability', 'calendar', 'appointments.manage'],
     '/admin/email-log' => ['Email log', 'mail', 'email_log.view'],
     '/admin/data-tools' => ['Import / export', 'file', ['services.manage', 'events.manage', 'testimonials.manage', 'blog.manage', 'contacts.manage', 'grants.manage']],
+    '/admin/branding' => ['Branding', 'image', 'branding.manage'],
     '/admin/settings' => ['Site settings', 'settings', 'settings.manage'],
     '/admin/users' => ['Administrators', 'users', 'users.manage'],
     '/admin/roles' => ['Roles & access', 'lock', 'roles.manage'],

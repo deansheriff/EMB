@@ -20,7 +20,7 @@
 <section class="section bg-white">
     <div class="mx-auto grid max-w-content gap-12 px-5 lg:grid-cols-[.7fr_1.3fr] lg:px-6">
         <div><p class="eyebrow">Our mission</p><h2 class="section-heading mt-4">Support that meets people where they are</h2></div>
-        <div class="prose-warm text-lg"><?= page_content('fiyff', 'mission') ?></div>
+        <div class="prose-warm text-lg"><?= safe_html(page_content('fiyff', 'mission')) ?></div>
     </div>
 </section>
 

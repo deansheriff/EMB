@@ -23,6 +23,7 @@ INSERT INTO permissions (slug, name, group_name, description) VALUES
 ('contacts.manage', 'Manage contact submissions', 'Client Services', 'Read, archive, and delete contact submissions.'),
 ('appointments.manage', 'Manage appointments', 'Client Services', 'Manage bookings, payment history, scheduling, and client updates.'),
 ('email_log.view', 'View email log', 'Client Services', 'Review transactional email delivery history and failures.'),
+('branding.manage', 'Manage branding', 'Content', 'Change the site logo and the default social sharing image.'),
 ('settings.manage', 'Manage site settings', 'Configuration', 'Manage branding, SMTP, Paystack, and global settings.'),
 ('users.manage', 'Manage administrators', 'Access Control', 'Create, update, activate, and deactivate admin users.'),
 ('roles.manage', 'Manage roles', 'Access Control', 'Create roles and assign permissions within the current administrator’s authority.')
@@ -35,7 +36,7 @@ WHERE a.email = 'admin@embchronicles.com';
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
 WHERE r.slug = 'content-manager' AND p.slug IN
-('dashboard.view','events.manage','services.manage','heroes.manage','testimonials.manage','blog.manage','content.manage');
+('dashboard.view','events.manage','services.manage','heroes.manage','testimonials.manage','blog.manage','content.manage','branding.manage');
 
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
@@ -93,7 +94,8 @@ INSERT INTO site_settings (`key`, `value`, `type`) VALUES
 ('appointment_types_migration', '1', 'boolean'),
 ('testimonial_submissions_enabled', '1', 'boolean'),
 ('testimonial_auto_approve', '0', 'boolean'),
-('content_features_migration', '1', 'boolean')
+('content_features_migration', '1', 'boolean'),
+('security_hardening_migration', '1', 'boolean')
 ON DUPLICATE KEY UPDATE
 `value` = IF(
   site_settings.`key` IN (

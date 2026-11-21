@@ -38,7 +38,7 @@
         <div>
             <p class="eyebrow">The vision</p>
             <h2 class="section-heading mt-4">Your degree is not a dead end</h2>
-            <div class="prose-warm mt-6 text-lg"><?= page_content('community', 'vision') ?></div>
+            <div class="prose-warm mt-6 text-lg"><?= safe_html(page_content('community', 'vision')) ?></div>
             <a class="button button-primary mt-8" href="<?= e(setting('whatsapp')) ?>" target="_blank" rel="noopener">Join our WhatsApp community</a>
         </div>
         <div class="rounded-[28px] bg-blush p-8">

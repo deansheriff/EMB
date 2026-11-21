@@ -174,8 +174,260 @@ function setting(string $key, mixed $default = ''): mixed
         } catch (Throwable) {
             $settings = [];
         }
+        if ($settings) {
+            try {
+                $settings = apply_env_setting_defaults($settings);
+            } catch (Throwable) {
+                // Keep the saved settings if the one-time defaults cannot be written.
+            }
+        }
     }
     return $settings[$key] ?? $default;
+}
+
+/**
+ * Copies SMTP and Paystack credentials from the environment into site settings
+ * the first time they are found and the matching settings are still empty.
+ * A sentinel row makes this a one-time default, so later admin changes win.
+ */
+function apply_env_setting_defaults(array $settings): array
+{
+    $groups = [
+        'smtp' => [
+            'trigger' => 'SMTP_HOST',
+            'empty_setting' => 'smtp_host',
+            'map' => [
+                'smtp_host' => ['SMTP_HOST', 'text'],
+                'smtp_port' => ['SMTP_PORT', 'number'],
+                'smtp_encryption' => ['SMTP_ENCRYPTION', 'text'],
+                'smtp_username' => ['SMTP_USERNAME', 'text'],
+                'smtp_password' => ['SMTP_PASSWORD', 'secret'],
+                'smtp_from_email' => ['SMTP_FROM_EMAIL', 'email'],
+                'smtp_from_name' => ['SMTP_FROM_NAME', 'text'],
+                'smtp_admin_email' => ['SMTP_ADMIN_EMAIL', 'email'],
+            ],
+            'flag' => ['smtp_enabled', 'SMTP_ENABLED'],
+        ],
+        'paystack' => [
+            'trigger' => 'PAYSTACK_SECRET_KEY',
+            'empty_setting' => 'paystack_secret_key',
+            'map' => [
+                'paystack_public_key' => ['PAYSTACK_PUBLIC_KEY', 'text'],
+                'paystack_secret_key' => ['PAYSTACK_SECRET_KEY', 'secret'],
+            ],
+            'flag' => ['paystack_enabled', 'PAYSTACK_ENABLED'],
+        ],
+    ];
+    foreach ($groups as $name => $group) {
+        $sentinel = 'env_defaults_' . $name . '_applied';
+        if (isset($settings[$sentinel]) || trim((string) env($group['trigger'], '')) === '') {
+            continue;
+        }
+        $updates = [];
+        if (trim((string) ($settings[$group['empty_setting']] ?? '')) === '') {
+            foreach ($group['map'] as $settingKey => [$envKey, $type]) {
+                $value = trim((string) env($envKey, ''));
+                if ($value !== '') {
+                    $updates[$settingKey] = [$value, $type];
+                }
+            }
+            [$flagKey, $flagEnv] = $group['flag'];
+            if (filter_var(env($flagEnv, 'false'), FILTER_VALIDATE_BOOLEAN)) {
+                $updates[$flagKey] = ['1', 'boolean'];
+            }
+        }
+        $updates[$sentinel] = ['1', 'boolean'];
+        $stmt = db()->prepare(
+            'INSERT INTO site_settings (`key`, `value`, `type`) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), `type` = VALUES(`type`)'
+        );
+        foreach ($updates as $settingKey => [$value, $type]) {
+            $stmt->execute([$settingKey, $value, $type]);
+            $settings[$settingKey] = $value;
+        }
+    }
+    return $settings;
+}
+
+function client_ip(): string
+{
+    if (filter_var(env('TRUST_PROXY', 'false'), FILTER_VALIDATE_BOOLEAN)) {
+        $forwarded = trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''))[0]);
+        if (filter_var($forwarded, FILTER_VALIDATE_IP)) {
+            return $forwarded;
+        }
+    }
+    return (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+}
+
+function rate_limit_count(string $bucket, string $key, int $windowSeconds): int
+{
+    try {
+        return (int) query_value(
+            'SELECT COUNT(*) FROM rate_limits WHERE bucket = ? AND key_hash = ? AND created_at > (NOW() - INTERVAL ' . max(1, $windowSeconds) . ' SECOND)',
+            [$bucket, hash('sha256', strtolower($key))]
+        );
+    } catch (Throwable) {
+        // Fail open if the rate_limits table has not been migrated yet.
+        return 0;
+    }
+}
+
+function rate_limit_record(string $bucket, string $key): void
+{
+    try {
+        db()->prepare('INSERT INTO rate_limits (bucket, key_hash) VALUES (?, ?)')
+            ->execute([$bucket, hash('sha256', strtolower($key))]);
+        if (random_int(1, 50) === 1) {
+            db()->exec('DELETE FROM rate_limits WHERE created_at < (NOW() - INTERVAL 2 DAY)');
+        }
+    } catch (Throwable) {
+    }
+}
+
+function rate_limit_clear(string $bucket, string $key): void
+{
+    try {
+        db()->prepare('DELETE FROM rate_limits WHERE bucket = ? AND key_hash = ?')
+            ->execute([$bucket, hash('sha256', strtolower($key))]);
+    } catch (Throwable) {
+    }
+}
+
+/**
+ * Throttles a public form both per browser session (short cooldown) and per
+ * client IP address (hourly cap) so scripts cannot bypass it by dropping cookies.
+ */
+function public_form_throttled(string $form, int $maxPerHour, int $cooldownSeconds = 20): bool
+{
+    if (form_rate_limited($form, $cooldownSeconds)) {
+        return true;
+    }
+    $bucket = 'form:' . $form;
+    $ip = client_ip();
+    if (rate_limit_count($bucket, $ip, 3600) >= $maxPerHour) {
+        return true;
+    }
+    rate_limit_record($bucket, $ip);
+    return false;
+}
+
+function safe_back_url(string $fallback = '/'): string
+{
+    $referer = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+    $appHost = parse_url((string) env('APP_URL', ''), PHP_URL_HOST);
+    $refererHost = parse_url($referer, PHP_URL_HOST);
+    $currentHost = $_SERVER['HTTP_HOST'] ?? null;
+    if ($referer !== '' && $refererHost && ($refererHost === $appHost || $refererHost === $currentHost)) {
+        return $referer;
+    }
+    return url($fallback);
+}
+
+/**
+ * Allow-list HTML sanitizer for admin-authored rich text (blog posts, event
+ * and service descriptions, page sections). Scripts, embeds, forms, inline
+ * styles, event handlers, and unsafe URL schemes are removed.
+ */
+function safe_html(?string $html): string
+{
+    $html = (string) $html;
+    if (trim($html) === '') {
+        return '';
+    }
+    static $cache = [];
+    $cacheKey = md5($html);
+    if (isset($cache[$cacheKey])) {
+        return $cache[$cacheKey];
+    }
+
+    $document = new DOMDocument('1.0', 'UTF-8');
+    $previous = libxml_use_internal_errors(true);
+    $document->loadHTML(
+        '<?xml encoding="UTF-8"><div data-safe-root="1">' . $html . '</div>',
+        LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NONET
+    );
+    libxml_clear_errors();
+    libxml_use_internal_errors($previous);
+
+    $root = (new DOMXPath($document))->query('//div[@data-safe-root="1"]')->item(0);
+    if (!$root instanceof DOMElement) {
+        return $cache[$cacheKey] = e(strip_tags($html));
+    }
+    safe_html_clean_children($root);
+    $output = '';
+    foreach (iterator_to_array($root->childNodes) as $child) {
+        $output .= $document->saveHTML($child);
+    }
+    return $cache[$cacheKey] = $output;
+}
+
+function safe_html_clean_children(DOMNode $parent): void
+{
+    static $allowed = [
+        'p' => [], 'br' => [], 'hr' => [], 'strong' => [], 'b' => [], 'em' => [], 'i' => [], 'u' => [], 's' => [],
+        'small' => [], 'sub' => [], 'sup' => [], 'span' => [], 'div' => [], 'blockquote' => ['cite'],
+        'h1' => [], 'h2' => [], 'h3' => [], 'h4' => [], 'h5' => [], 'h6' => [],
+        'ul' => [], 'ol' => ['start', 'type'], 'li' => [], 'dl' => [], 'dt' => [], 'dd' => [],
+        'a' => ['href', 'title', 'target', 'rel'],
+        'img' => ['src', 'alt', 'title', 'width', 'height', 'loading'],
+        'figure' => [], 'figcaption' => [], 'code' => [], 'pre' => [], 'mark' => [], 'abbr' => ['title'],
+        'table' => [], 'thead' => [], 'tbody' => [], 'tfoot' => [], 'tr' => [], 'caption' => [],
+        'th' => ['colspan', 'rowspan', 'scope'], 'td' => ['colspan', 'rowspan'],
+    ];
+    static $dropWithContent = [
+        'script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'form', 'input',
+        'button', 'select', 'textarea', 'option', 'meta', 'link', 'base', 'svg', 'math', 'template',
+        'noscript', 'audio', 'video', 'source', 'track', 'canvas', 'title', 'head',
+    ];
+
+    foreach (iterator_to_array($parent->childNodes) as $node) {
+        if ($node instanceof DOMText) {
+            continue;
+        }
+        if (!$node instanceof DOMElement) {
+            $parent->removeChild($node);
+            continue;
+        }
+        $tag = strtolower($node->tagName);
+        if (in_array($tag, $dropWithContent, true)) {
+            $parent->removeChild($node);
+            continue;
+        }
+        if (!isset($allowed[$tag])) {
+            safe_html_clean_children($node);
+            while ($node->firstChild) {
+                $parent->insertBefore($node->firstChild, $node);
+            }
+            $parent->removeChild($node);
+            continue;
+        }
+        $permitted = array_merge($allowed[$tag], ['class']);
+        foreach (iterator_to_array($node->attributes) as $attribute) {
+            $name = strtolower($attribute->name);
+            if (!in_array($name, $permitted, true)) {
+                $node->removeAttribute($attribute->name);
+                continue;
+            }
+            if (in_array($name, ['href', 'src', 'cite'], true)
+                && !safe_html_url_allowed($attribute->value, $name === 'href' ? ['http', 'https', 'mailto', 'tel'] : ['http', 'https'])) {
+                $node->removeAttribute($attribute->name);
+            }
+        }
+        if ($tag === 'a' && strtolower($node->getAttribute('target')) === '_blank') {
+            $node->setAttribute('rel', 'noopener noreferrer');
+        }
+        safe_html_clean_children($node);
+    }
+}
+
+function safe_html_url_allowed(string $url, array $schemes): bool
+{
+    $normalized = preg_replace('/[\x00-\x20]+/', '', html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '';
+    if (!preg_match('/^([a-z][a-z0-9+.\-]*):/i', $normalized, $matches)) {
+        return true;
+    }
+    return in_array(strtolower($matches[1]), $schemes, true);
 }
 
 function page_section(string $page, string $section): ?array
@@ -326,10 +578,29 @@ function attempt_login(string $email, string $password): bool
         return false;
     }
     session_regenerate_id(true);
+    rate_limit_clear('login_email', strtolower(trim($email)));
     $_SESSION['admin_id'] = (int) $admin['id'];
     $_SESSION['_csrf'] = bin2hex(random_bytes(32));
     db()->prepare('UPDATE admins SET last_login_at = NOW() WHERE id = ?')->execute([$admin['id']]);
     return true;
+}
+
+const DEFAULT_ADMIN_PASSWORD = 'ChangeMe123!';
+const LOGIN_MAX_FAILURES_PER_EMAIL = 5;
+const LOGIN_MAX_FAILURES_PER_IP = 20;
+const LOGIN_FAILURE_WINDOW_SECONDS = 900;
+
+function login_locked_out(string $email): bool
+{
+    $email = strtolower(trim($email));
+    return rate_limit_count('login_email', $email, LOGIN_FAILURE_WINDOW_SECONDS) >= LOGIN_MAX_FAILURES_PER_EMAIL
+        || rate_limit_count('login_ip', client_ip(), LOGIN_FAILURE_WINDOW_SECONDS) >= LOGIN_MAX_FAILURES_PER_IP;
+}
+
+function record_login_failure(string $email): void
+{
+    rate_limit_record('login_email', strtolower(trim($email)));
+    rate_limit_record('login_ip', client_ip());
 }
 
 function logout_admin(): void

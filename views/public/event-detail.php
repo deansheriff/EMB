@@ -29,7 +29,7 @@
             </div>
         </aside>
         <article>
-            <div class="prose-warm prose-large"><?= $event['description'] ?></div>
+            <div class="prose-warm prose-large"><?= safe_html($event['description']) ?></div>
             <?php if ($gallery): ?>
                 <section class="mt-12" aria-labelledby="event-gallery-title">
                     <p class="eyebrow">Event gallery</p>

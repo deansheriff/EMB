@@ -300,7 +300,7 @@ function submit_contact(): void
     if (!is_honeypot_clean()) {
         redirect('/contact?sent=1');
     }
-    if (form_rate_limited('contact')) {
+    if (public_form_throttled('contact', 5)) {
         flash('error', 'Please wait a moment before submitting another message.');
         redirect('/contact');
     }
@@ -335,7 +335,7 @@ function submit_public_testimonial(): void
         flash('error', 'Public testimonial submissions are currently paused.');
         redirect('/testimonials');
     }
-    if (form_rate_limited('testimonial')) {
+    if (public_form_throttled('testimonial', 3)) {
         flash('error', 'Please wait a moment before submitting another testimonial.');
         redirect('/testimonials');
     }
@@ -362,6 +362,40 @@ function submit_public_testimonial(): void
     redirect('/testimonials?sent=1');
 }
 
+/** Minutes an unpaid booking holds its slot before it is released to others. */
+const APPOINTMENT_PAYMENT_HOLD_MINUTES = 30;
+
+/**
+ * SQL condition for appointments that still occupy capacity: anything not
+ * cancelled, except unpaid checkout holds older than the hold window.
+ */
+function appointment_occupies_slot_sql(): string
+{
+    return "status <> 'cancelled' AND NOT (status = 'pending_payment' AND payment_status <> 'paid'"
+        . ' AND updated_at < (NOW() - INTERVAL ' . APPOINTMENT_PAYMENT_HOLD_MINUTES . ' MINUTE))';
+}
+
+/** Returns an error message when the slot cannot take another booking, or null when it can. */
+function appointment_capacity_error(PDO $pdo, string $preferredDate, int $slotId, int $capacity, int $excludeAppointmentId = 0): ?string
+{
+    $countStmt = $pdo->prepare(
+        'SELECT
+            SUM(CASE WHEN availability_slot_id = ? THEN 1 ELSE 0 END) AS slot_count,
+            COUNT(*) AS day_count
+         FROM appointments
+         WHERE preferred_date = ? AND id <> ? AND ' . appointment_occupies_slot_sql()
+    );
+    $countStmt->execute([$slotId, $preferredDate, $excludeAppointmentId]);
+    $counts = $countStmt->fetch() ?: ['slot_count' => 0, 'day_count' => 0];
+    if ((int) $counts['slot_count'] >= $capacity) {
+        return 'That time has just filled up. Please choose another slot.';
+    }
+    if ((int) $counts['day_count'] >= max(1, (int) setting('appointment_daily_limit', 6))) {
+        return 'The selected date has reached its booking limit. Please choose another date.';
+    }
+    return null;
+}
+
 function appointment_availability_context(): array
 {
     $noticeHours = max(0, (int) setting('appointment_min_notice_hours', 24));
@@ -376,7 +410,7 @@ function appointment_availability_context(): array
          FROM appointments
          WHERE preferred_date BETWEEN ? AND ?
            AND availability_slot_id IS NOT NULL
-           AND status <> 'cancelled'
+           AND " . appointment_occupies_slot_sql() . "
          GROUP BY preferred_date, availability_slot_id",
         [$minDate, $maxDate]
     );
@@ -408,7 +442,7 @@ function submit_appointment(): void
     if (!is_honeypot_clean()) {
         redirect('/appointment?sent=1');
     }
-    if (form_rate_limited('appointment')) {
+    if (public_form_throttled('appointment', 5)) {
         flash('error', 'Please wait a moment before submitting another request.');
         redirect('/appointment');
     }
@@ -480,20 +514,9 @@ function submit_appointment(): void
         if ($appointmentTime < $minimumTime || $date > $maximumDate) {
             throw new RuntimeException('Choose a time within the available booking window.');
         }
-        $countStmt = $pdo->prepare(
-            "SELECT
-                SUM(CASE WHEN availability_slot_id = ? THEN 1 ELSE 0 END) AS slot_count,
-                COUNT(*) AS day_count
-             FROM appointments
-             WHERE preferred_date = ? AND status <> 'cancelled'"
-        );
-        $countStmt->execute([$slotId, $preferredDate]);
-        $counts = $countStmt->fetch() ?: ['slot_count' => 0, 'day_count' => 0];
-        if ((int) $counts['slot_count'] >= (int) $slot['capacity']) {
-            throw new RuntimeException('That time has just filled up. Please choose another slot.');
-        }
-        if ((int) $counts['day_count'] >= max(1, (int) setting('appointment_daily_limit', 6))) {
-            throw new RuntimeException('The selected date has reached its booking limit. Please choose another date.');
+        $capacityError = appointment_capacity_error($pdo, $preferredDate, $slotId, (int) $slot['capacity']);
+        if ($capacityError !== null) {
+            throw new RuntimeException($capacityError);
         }
         $stmt = $pdo->prepare(
             'INSERT INTO appointments
@@ -553,12 +576,15 @@ function submit_newsletter(): void
         redirect('/');
     }
     $email = strtolower(trim((string) ($_POST['email'] ?? '')));
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if (public_form_throttled('newsletter', 5)) {
+        flash('error', 'Please wait a moment before joining the list again.');
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         flash('error', 'Enter a valid email address to join the list.');
     } else {
         $stmt = db()->prepare('INSERT INTO newsletter_subscribers (email, consented_at) VALUES (?, NOW()) ON DUPLICATE KEY UPDATE consented_at = VALUES(consented_at)');
         $stmt->execute([$email]);
-        if (Mailer::confirmationsEnabled()) {
+        // rowCount() is 1 for a new subscriber; existing addresses are not emailed again.
+        if ($stmt->rowCount() === 1 && Mailer::confirmationsEnabled()) {
             Mailer::send(
                 $email,
                 '',
@@ -571,7 +597,7 @@ function submit_newsletter(): void
         }
         flash('success', 'You are on the list for future community updates.');
     }
-    redirect((string) ($_SERVER['HTTP_REFERER'] ?? url('/')));
+    redirect(safe_back_url('/'));
 }
 
 function submit_grant_application(string $slug): void
@@ -585,7 +611,7 @@ function submit_grant_application(string $slug): void
     if (!is_honeypot_clean()) {
         redirect('/grant-application/' . $slug . '?sent=1');
     }
-    if (form_rate_limited('grant', 60)) {
+    if (public_form_throttled('grant', 5, 60)) {
         flash('error', 'Please wait before submitting another application.');
         redirect('/grant-application/' . $slug);
     }
@@ -675,7 +701,7 @@ function submit_managed_grant_application(string $slug): void
     if (!is_honeypot_clean()) {
         redirect('/grants/' . $slug . '/apply?sent=1');
     }
-    if (form_rate_limited('managed_grant_' . $form['id'], 60)) {
+    if (public_form_throttled('managed_grant_' . $form['id'], 5, 60)) {
         flash('error', 'Please wait before submitting another application.');
         redirect('/grants/' . $slug . '/apply');
     }
@@ -958,7 +984,7 @@ function begin_appointment_payment(int $appointmentId): string
 function retry_appointment_payment(string $bookingCode): void
 {
     verify_csrf();
-    if (form_rate_limited('appointment_payment', 5)) {
+    if (public_form_throttled('appointment_payment', 10, 5)) {
         flash('error', 'Please wait a moment before starting checkout again.');
         redirect('/appointment/status/' . $bookingCode);
     }
@@ -974,6 +1000,11 @@ function retry_appointment_payment(string $bookingCode): void
         flash('error', 'This appointment can no longer accept payment.');
         redirect('/appointment/status/' . $bookingCode);
     }
+    $releaseError = appointment_reclaim_expired_hold($appointment);
+    if ($releaseError !== null) {
+        flash('error', $releaseError);
+        redirect('/appointment/status/' . $bookingCode);
+    }
     try {
         redirect(begin_appointment_payment((int) $appointment['id']));
     } catch (Throwable $exception) {
@@ -981,6 +1012,53 @@ function retry_appointment_payment(string $bookingCode): void
         flash('error', 'Secure checkout could not start. Please try again or contact us for help.');
         redirect('/appointment/status/' . $bookingCode);
     }
+}
+
+/**
+ * When an unpaid hold has expired, its slot may have been given to someone
+ * else. Re-check capacity before letting the client restart checkout.
+ */
+function appointment_reclaim_expired_hold(array $appointment): ?string
+{
+    if ($appointment['status'] !== 'pending_payment' || empty($appointment['availability_slot_id']) || empty($appointment['preferred_date'])) {
+        return null;
+    }
+    $expired = (int) query_value(
+        'SELECT updated_at < (NOW() - INTERVAL ' . APPOINTMENT_PAYMENT_HOLD_MINUTES . ' MINUTE) FROM appointments WHERE id = ?',
+        [$appointment['id']]
+    ) === 1;
+    if (!$expired) {
+        return null;
+    }
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        $weekday = (int) (new DateTimeImmutable((string) $appointment['preferred_date']))->format('N');
+        $slotStmt = $pdo->prepare('SELECT * FROM appointment_availability_slots WHERE weekday = ? AND is_active = 1 FOR UPDATE');
+        $slotStmt->execute([$weekday]);
+        $slot = null;
+        foreach ($slotStmt->fetchAll() as $candidate) {
+            if ((int) $candidate['id'] === (int) $appointment['availability_slot_id']) {
+                $slot = $candidate;
+            }
+        }
+        $error = $slot === null
+            ? 'This time slot is no longer offered.'
+            : appointment_capacity_error($pdo, (string) $appointment['preferred_date'], (int) $slot['id'], (int) $slot['capacity'], (int) $appointment['id']);
+        if ($error === null) {
+            // Touch the row so the hold restarts from now.
+            $pdo->prepare('UPDATE appointments SET updated_at = NOW() WHERE id = ?')->execute([$appointment['id']]);
+        }
+        $pdo->commit();
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    }
+    return $error === null
+        ? null
+        : 'Your unpaid booking was released after ' . APPOINTMENT_PAYMENT_HOLD_MINUTES . ' minutes and the time is now taken. ' . $error . ' Please make a new booking or contact us.';
 }
 
 function handle_paystack_callback(): void

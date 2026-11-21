@@ -94,7 +94,16 @@ function export_data_csv(string $type): never
 function csv_export_value(mixed $value): string
 {
     $value = (string) ($value ?? '');
-    return preg_match('/^[=+\-@]/', ltrim($value)) ? "'" . $value : $value;
+    // Neutralise spreadsheet formulas. csv_import_value() reverses this on import.
+    return preg_match('/^[\t\r]|^\s*[=+\-@]/', $value) ? "'" . $value : $value;
+}
+
+function csv_import_value(mixed $value): string
+{
+    $value = trim((string) $value);
+    // Undo the formula guard added by csv_export_value() so values such as
+    // "+234…" phone numbers survive an export → import round trip.
+    return preg_replace("/^'(?=\\s*[=+\\-@])/", '', $value) ?? $value;
 }
 
 function import_data_csv(string $type, ?array $file): int
@@ -143,7 +152,7 @@ function import_data_csv(string $type, ?array $file): int
             if ($row === false) {
                 throw new RuntimeException('Unable to read row ' . $line . '.');
             }
-            import_data_row($type, array_map(static fn ($value): string => trim((string) $value), $row), $line);
+            import_data_row($type, array_map('csv_import_value', $row), $line);
             $count++;
         }
         $pdo->commit();

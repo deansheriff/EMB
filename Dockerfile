@@ -54,6 +54,7 @@ ENV APP_ENV=production \
     APP_DEBUG=false \
     APP_TIMEZONE=Africa/Lagos \
     SESSION_SECURE=true \
+    TRUST_PROXY=true \
     DB_PORT=3306 \
     DB_BOOTSTRAP=true \
     DB_WAIT_TIMEOUT=60 \
