@@ -3,6 +3,18 @@
 @tailwind utilities;
 
 @layer base {
+  /* Default brand palette; Admin -> Branding can override these on public pages. */
+  :root {
+    --color-ink: 46 37 39;
+    --color-muted: 111 98 101;
+    --color-ivory: 252 248 244;
+    --color-blush: 245 231 233;
+    --color-wine: 110 51 69;
+    --color-berry: 154 79 98;
+    --color-sage: 86 117 104;
+    --color-amber: 198 139 76;
+    --color-line: 232 220 218;
+  }
   html { max-width: 100%; overflow-x: clip; scroll-behavior: smooth; }
   body { max-width: 100%; overflow-x: clip; }
   h1, h2, h3, p { text-wrap: pretty; }
@@ -26,10 +38,10 @@
   .site-nav { @apply invisible fixed inset-x-4 top-[80px] z-50 flex max-h-[calc(100dvh-6rem)] -translate-y-3 flex-col gap-1 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-white p-4 opacity-0 shadow-soft transition lg:visible lg:static lg:ml-auto lg:max-h-none lg:translate-y-0 lg:flex-row lg:items-center lg:overflow-visible lg:bg-transparent lg:p-0 lg:opacity-100 lg:shadow-none; }
   .site-nav.is-open { @apply visible translate-y-0 opacity-100; }
   .site-nav > a:not(.button) { @apply rounded-lg px-3 py-3 text-sm font-semibold text-muted transition hover:bg-blush hover:text-wine lg:py-2; }
-  .site-nav > a.is-active:not(.button) { @apply bg-blush text-wine lg:bg-transparent lg:shadow-[inset_0_-2px_0_#9A4F62]; }
+  .site-nav > a.is-active:not(.button) { @apply bg-blush text-wine lg:bg-transparent lg:shadow-[inset_0_-2px_0_rgb(var(--color-berry))]; }
 
   .button { @apply inline-flex min-h-12 items-center justify-center rounded-xl px-5 py-3 text-center text-sm font-bold transition duration-200 disabled:pointer-events-none disabled:opacity-50; }
-  .button-primary { @apply bg-berry text-white shadow-[0_10px_24px_rgba(154,79,98,.18)] hover:-translate-y-0.5 hover:bg-wine; }
+  .button-primary { @apply bg-berry text-white shadow-[0_10px_24px_rgb(var(--color-berry)/.18)] hover:-translate-y-0.5 hover:bg-wine; }
   .button-secondary { @apply border border-berry bg-white text-wine hover:-translate-y-0.5 hover:bg-blush; }
   .button-danger { @apply border border-red-200 bg-red-50 text-red-700 hover:bg-red-100; }
   .icon-button { @apply grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-white text-lg transition hover:bg-blush; }

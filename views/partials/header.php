@@ -20,16 +20,17 @@ $navItems = [
 </div>
 <header class="site-header" data-header>
     <div class="mx-auto flex max-w-content items-center gap-3 px-5 py-4 sm:gap-6 lg:px-6">
-        <a href="<?= e(url('/')) ?>" class="flex min-w-0 shrink-0 items-center gap-3" aria-label="Emb Chronicles home">
+        <a href="<?= e(url('/')) ?>" class="flex min-w-0 shrink-0 items-center gap-3" aria-label="<?= e(setting('site_name', 'Emb Chronicles')) ?> home">
             <?php if ($logo): ?>
-                <img src="<?= e(media_url($logo)) ?>" alt="<?= e(setting('site_name')) ?>" class="h-11 w-auto max-w-[150px] object-contain sm:max-w-[180px]">
+                <?php /* An uploaded logo replaces the text name and tagline entirely. */ ?>
+                <img src="<?= e(media_url($logo)) ?>" alt="<?= e(setting('site_name', 'Emb Chronicles')) ?>" class="h-11 w-auto max-w-[150px] object-contain sm:h-12 sm:max-w-[240px]">
             <?php else: ?>
                 <span class="grid size-11 place-items-center rounded-full bg-wine font-display text-xl text-white">EC</span>
+                <span class="hidden min-w-0 sm:block">
+                    <span class="block font-display text-xl font-semibold leading-none text-wine"><?= e(setting('site_name', 'Emb Chronicles')) ?></span>
+                    <span class="mt-1 block text-[10px] font-bold uppercase tracking-[.19em] text-muted"><?= e(setting('tagline', 'Fertility Education')) ?></span>
+                </span>
             <?php endif; ?>
-            <span class="hidden min-w-0 sm:block">
-                <span class="block font-display text-xl font-semibold leading-none text-wine"><?= e(setting('site_name', 'Emb Chronicles')) ?></span>
-                <span class="mt-1 block text-[10px] font-bold uppercase tracking-[.19em] text-muted"><?= e(setting('tagline', 'Fertility Education')) ?></span>
-            </span>
         </a>
         <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
             <?php foreach ($navItems as $href => $label): ?>

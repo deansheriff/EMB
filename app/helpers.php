@@ -249,6 +249,55 @@ function apply_env_setting_defaults(array $settings): array
     return $settings;
 }
 
+/** Editable brand colours: key => [label, help text, default hex]. Keys match the Tailwind palette. */
+const THEME_COLORS = [
+    'wine' => ['Primary', 'Headings, links, footer background, and button hover.', '#6E3345'],
+    'berry' => ['Accent', 'Main buttons, highlights, and the active menu underline.', '#9A4F62'],
+    'blush' => ['Soft accent', 'Light tinted panels and menu hover background.', '#F5E7E9'],
+    'sage' => ['Secondary', 'Success messages and secondary highlights.', '#567568'],
+    'amber' => ['Highlight', 'Featured labels and warm highlights.', '#C68B4C'],
+    'ivory' => ['Page background', 'Background behind most page sections.', '#FCF8F4'],
+    'ink' => ['Body text', 'Main paragraph and heading text.', '#2E2527'],
+    'muted' => ['Muted text', 'Supporting text, captions, and labels.', '#6F6265'],
+    'line' => ['Borders', 'Card borders and dividers.', '#E8DCDA'],
+];
+
+function normalize_hex_color(string $value): ?string
+{
+    $value = trim($value);
+    if (preg_match('/^#?([0-9a-f]{3})$/i', $value, $m)) {
+        $value = '#' . $m[1][0] . $m[1][0] . $m[1][1] . $m[1][1] . $m[1][2] . $m[1][2];
+    }
+    if (!preg_match('/^#?([0-9a-f]{6})$/i', $value, $m)) {
+        return null;
+    }
+    return '#' . strtoupper($m[1]);
+}
+
+/** @return array<string, string> theme key => #RRGGBB, saved values falling back to defaults */
+function theme_colors(): array
+{
+    $colors = [];
+    foreach (THEME_COLORS as $key => [, , $default]) {
+        $colors[$key] = normalize_hex_color((string) setting('theme_color_' . $key, '')) ?? $default;
+    }
+    return $colors;
+}
+
+/** Inline CSS that overrides the default palette, or '' when nothing differs from the defaults. */
+function theme_css_variables(): string
+{
+    $declarations = [];
+    foreach (theme_colors() as $key => $hex) {
+        if ($hex === THEME_COLORS[$key][2]) {
+            continue;
+        }
+        [$r, $g, $b] = sscanf($hex, '#%02x%02x%02x');
+        $declarations[] = '--color-' . $key . ':' . $r . ' ' . $g . ' ' . $b;
+    }
+    return $declarations ? ':root{' . implode(';', $declarations) . '}' : '';
+}
+
 function client_ip(): string
 {
     if (filter_var(env('TRUST_PROXY', 'false'), FILTER_VALIDATE_BOOLEAN)) {

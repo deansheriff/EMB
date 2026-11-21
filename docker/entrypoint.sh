@@ -102,7 +102,10 @@ if [ "${DB_BOOTSTRAP:-true}" = "true" ]; then
     run_sql_file /var/www/html/database/migrations/20261121_security_hardening.sql
   fi
 
-  php /var/www/html/docker/secure-admin.php || echo "Warning: could not check the seeded administrator password." >&2
+fi
+
+if [ -n "${DB_HOST:-}" ]; then
+  php /var/www/html/docker/secure-admin.php || echo "Warning: could not check the administrator password." >&2
 fi
 
 exec "$@"

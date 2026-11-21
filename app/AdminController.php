@@ -134,8 +134,7 @@ function admin_login(): void
             redirect('/admin/login');
         }
         if ($password === DEFAULT_ADMIN_PASSWORD && env('APP_ENV', 'production') === 'production') {
-            record_login_failure($email);
-            flash('error', 'The default setup password is disabled in production. Set ADMIN_INITIAL_PASSWORD and redeploy, or reset the password hash in the database.');
+            flash('error', 'ChangeMe123! is the local setup password and does not work on the live site. Sign in with your ADMIN_INITIAL_PASSWORD value, or the temporary password shown in the deployment log.');
             redirect('/admin/login');
         }
         if (attempt_login($email, $password)) {
@@ -826,6 +825,22 @@ function admin_branding(): void
 {
     if (is_post()) {
         verify_csrf();
+        $colorUpdates = [];
+        foreach (THEME_COLORS as $key => [$label, , $default]) {
+            if (!empty($_POST['reset_colors'])) {
+                $colorUpdates['theme_color_' . $key] = $default;
+                continue;
+            }
+            if (!array_key_exists('theme_color_' . $key, $_POST)) {
+                continue;
+            }
+            $hex = normalize_hex_color((string) $_POST['theme_color_' . $key]);
+            if ($hex === null) {
+                flash('error', $label . ' colour must be a hex value such as #6E3345.');
+                redirect('/admin/branding');
+            }
+            $colorUpdates['theme_color_' . $key] = $hex;
+        }
         process_branding_uploads('/admin/branding');
         $stmt = db()->prepare(
             'INSERT INTO site_settings (`key`, `value`, `type`) VALUES (?, ?, ?)
@@ -836,8 +851,11 @@ function admin_branding(): void
                 $stmt->execute([$key, trim((string) $_POST[$key]), $type]);
             }
         }
+        foreach ($colorUpdates as $key => $hex) {
+            $stmt->execute([$key, $hex, 'color']);
+        }
         audit('save', 'branding', null);
-        flash('success', 'Branding saved.');
+        flash('success', !empty($_POST['reset_colors']) ? 'Brand colours reset to the defaults.' : 'Branding saved.');
         redirect('/admin/branding');
     }
     $settings = array_column(
@@ -845,7 +863,8 @@ function admin_branding(): void
         'value',
         'key'
     );
-    render('admin/branding', compact('settings') + ['title' => 'Branding'], 'admin');
+    $colors = theme_colors();
+    render('admin/branding', compact('settings', 'colors') + ['title' => 'Branding'], 'admin');
 }
 
 function admin_contacts(): void

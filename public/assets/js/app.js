@@ -662,4 +662,53 @@
       showStep(currentStep);
     }
   }
+
+  // Admin → Branding: keep colour pickers, hex fields, and the preview in sync.
+  const colorFields = qsa("[data-color-field]");
+  const colorPreview = qs("[data-color-preview]");
+  if (colorFields.length && colorPreview) {
+    const normalizeHex = (value) => {
+      const match = String(value).trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+      if (!match) return null;
+      const hex = match[1].length === 3 ? match[1].split("").map((c) => c + c).join("") : match[1];
+      return `#${hex.toUpperCase()}`;
+    };
+    const currentColors = () => {
+      const colors = {};
+      colorFields.forEach((field) => {
+        const text = qs("[data-color-text]", field);
+        const key = text.name.replace("theme_color_", "");
+        colors[key] = normalizeHex(text.value) || qs("[data-color-picker]", field).value;
+      });
+      return colors;
+    };
+    const renderPreview = () => {
+      const c = currentColors();
+      const set = (name, styles) => qsa(`[data-preview="${name}"]`, colorPreview).forEach((el) => Object.assign(el.style, styles));
+      set("line", { borderColor: c.line });
+      set("ivory", { backgroundColor: c.ivory });
+      set("wine", { color: c.wine });
+      set("ink", { color: c.ink });
+      set("muted", { color: c.muted });
+      set("berry", { backgroundColor: c.berry });
+      set("blush", { backgroundColor: c.blush, color: c.wine });
+      set("sage", { backgroundColor: c.sage });
+      set("amber", { backgroundColor: c.amber });
+      set("footer", { backgroundColor: c.wine });
+    };
+    colorFields.forEach((field) => {
+      const picker = qs("[data-color-picker]", field);
+      const text = qs("[data-color-text]", field);
+      picker.addEventListener("input", () => {
+        text.value = picker.value.toUpperCase();
+        renderPreview();
+      });
+      text.addEventListener("input", () => {
+        const hex = normalizeHex(text.value);
+        if (hex) picker.value = hex.toLowerCase();
+        renderPreview();
+      });
+    });
+    renderPreview();
+  }
 })();

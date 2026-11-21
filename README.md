@@ -49,7 +49,13 @@ Approved design source: [EMB Chronicles on Google Stitch](https://stitch.withgoo
 - Email: `admin@embchronicles.com`
 - Local development password: `ChangeMe123!`
 
-This seed password only works locally. When `APP_ENV=production` the sign-in form rejects it, and every Docker container start replaces it automatically: with `ADMIN_INITIAL_PASSWORD` when that variable is set (12+ characters), otherwise with a random temporary password printed once in the container log.
+This seed password only works locally. When `APP_ENV=production` the sign-in form rejects it.
+
+On the live site, set `ADMIN_INITIAL_PASSWORD` (12+ characters) and deploy. On every container start:
+
+- if `ADMIN_INITIAL_PASSWORD` is new or has changed since the last deploy, it becomes the password for `admin@embchronicles.com` (or `ADMIN_EMAIL`, if set) and sign-in lockouts are cleared. To recover a lost password, change the variable and redeploy;
+- if it is unchanged, the current password is kept, so a password changed in the dashboard survives redeploys;
+- any account still using `ChangeMe123!` gets a random temporary password printed in the deployment log.
 
 Admin sign-in is limited to 5 failed attempts per email address and 20 per IP address in any 15-minute window.
 
@@ -90,7 +96,7 @@ Open **Admin → Roles & access** to create roles and select the admin areas the
 - Client Services — contacts, appointments, payment history, and email logs;
 - Grant Reviewer — FIYFF grant applications.
 
-The **Manage branding** permission opens **Admin → Branding**, where the logo and default social sharing image can be changed without access to SMTP, Paystack, or other site settings. Add it to any role that should be able to change the logo.
+The **Manage branding** permission opens **Admin → Branding**, where the logo, default social sharing image, and website colours (primary, accent, backgrounds, text, and borders) can be changed without access to SMTP, Paystack, or other site settings. An uploaded logo replaces the site name and tagline in the header. Colour changes apply to public pages immediately, with a live preview and a one-click reset to the original palette. Add it to any role that should be able to change the logo.
 
 Permissions are enforced on every admin request as well as in the navigation. Administrators cannot grant permissions they do not possess, edit their own role assignment, deactivate themselves, or remove the final active super administrator.
 
@@ -216,6 +222,7 @@ UPLOAD_MAX_MB=8
 GRANT_UPLOAD_TOTAL_MB=18
 
 ADMIN_INITIAL_PASSWORD=a-long-unique-password
+# ADMIN_EMAIL=admin@embchronicles.com   (optional: which admin ADMIN_INITIAL_PASSWORD applies to)
 TRUST_PROXY=true
 
 SMTP_ENABLED=true

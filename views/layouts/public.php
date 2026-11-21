@@ -16,7 +16,7 @@ $canonical = url(ltrim(request_path(), '/'));
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($documentTitle) ?></title>
     <meta name="description" content="<?= e($description) ?>">
-    <meta name="theme-color" content="#6E3345">
+    <meta name="theme-color" content="<?= e(theme_colors()['wine']) ?>">
     <link rel="canonical" href="<?= e($canonical) ?>">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="<?= e($siteName) ?>">
@@ -39,6 +39,7 @@ $canonical = url(ltrim(request_path(), '/'));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
+    <?php if (($themeCss = theme_css_variables()) !== ''): ?><style><?= $themeCss ?></style><?php endif; ?>
     <script defer src="<?= e(asset('js/app.js')) ?>"></script>
 </head>
 <body class="bg-ivory font-sans text-ink antialiased <?= e($bodyClass ?? '') ?>">

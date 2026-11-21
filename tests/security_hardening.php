@@ -34,6 +34,15 @@ $checks['rejects_external_referer'] = safe_back_url('/') === url('/');
 $_SERVER['HTTP_REFERER'] = url('/events');
 $checks['accepts_same_site_referer'] = safe_back_url('/') === url('/events');
 
+$checks['hex_normalizes_short_and_lowercase'] = normalize_hex_color('abc') === '#AABBCC' && normalize_hex_color('#6e3345') === '#6E3345';
+$checks['hex_rejects_css_injection'] = normalize_hex_color('#123456;}body{display:none') === null && normalize_hex_color('red') === null;
+$checks['theme_defaults_cover_palette'] = count(theme_colors()) === 9;
+$css = (string) file_get_contents(BASE_PATH . '/public/assets/css/app.css');
+$checks['compiled_css_uses_theme_variables'] = str_contains($css, '--color-wine:110 51 69') || str_contains($css, '--color-wine: 110 51 69');
+$checks['compiled_css_has_no_hardcoded_wine'] = stripos($css, '110,51,69') === false && stripos($css, '110 51 69 /') === false;
+$header = (string) file_get_contents(BASE_PATH . '/views/partials/header.php');
+$checks['logo_replaces_site_name'] = (bool) preg_match('/if \(\$logo\):.*?<img.*?else:.*?site_name.*?endif;/s', $header);
+
 $passed = !in_array(false, $checks, true);
 echo json_encode(['passed' => $passed, 'checks' => $checks], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), PHP_EOL;
 exit($passed ? 0 : 1);

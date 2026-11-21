@@ -41,5 +41,38 @@
             <?php endif; ?>
         </div>
     </section>
+    <section class="admin-card">
+        <div class="admin-card-header"><h2>Website colours</h2><span class="text-xs text-muted">Applied to every public page</span></div>
+        <p class="mt-3 text-sm text-muted">Pick a colour or type a hex value such as <code>#6E3345</code>. Keep text colours dark and background colours light so pages stay readable.</p>
+        <div class="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <?php foreach (THEME_COLORS as $key => [$label, $help, $default]): ?>
+                <div class="form-field" data-color-field>
+                    <label for="theme_color_<?= e($key) ?>"><?= e($label) ?></label>
+                    <div class="flex items-center gap-3">
+                        <input type="color" class="h-12 w-14 shrink-0 cursor-pointer rounded-lg border border-line bg-white p-1" value="<?= e(strtolower($colors[$key])) ?>" aria-label="<?= e($label) ?> colour picker" data-color-picker>
+                        <input id="theme_color_<?= e($key) ?>" class="form-control font-mono uppercase" name="theme_color_<?= e($key) ?>" value="<?= e($colors[$key]) ?>" maxlength="7" pattern="#?[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?" data-color-text>
+                    </div>
+                    <p class="field-help"><?= e($help) ?> Default <?= e($default) ?>.</p>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <div class="mt-6 rounded-xl border border-line p-5" data-color-preview>
+            <p class="text-xs font-bold uppercase tracking-[.12em] text-muted">Preview</p>
+            <div class="mt-3 overflow-hidden rounded-xl border" data-preview="line">
+                <div class="p-5" data-preview="ivory">
+                    <p class="font-display text-2xl" data-preview="wine">A heading in the primary colour</p>
+                    <p class="mt-2 text-sm" data-preview="ink">Body text appears like this, <span data-preview="muted">with supporting text in the muted colour.</span></p>
+                    <div class="mt-4 flex flex-wrap gap-3">
+                        <span class="inline-flex min-h-10 items-center rounded-xl px-4 text-sm font-bold text-white" data-preview="berry">Main button</span>
+                        <span class="inline-flex min-h-10 items-center rounded-xl px-4 text-sm font-bold" data-preview="blush">Soft panel</span>
+                        <span class="inline-flex min-h-10 items-center rounded-full px-3 text-xs font-bold text-white" data-preview="sage">Secondary</span>
+                        <span class="inline-flex min-h-10 items-center rounded-full px-3 text-xs font-bold text-white" data-preview="amber">Highlight</span>
+                    </div>
+                </div>
+                <div class="p-5 text-sm text-white" data-preview="footer">Footer background uses the primary colour.</div>
+            </div>
+        </div>
+        <label class="consent-row mt-5"><input type="checkbox" name="reset_colors" value="1"><span>Reset all colours to the original EMB Chronicles palette when saving</span></label>
+    </section>
     <button class="button button-primary">Save branding</button>
 </form>

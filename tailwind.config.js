@@ -8,15 +8,15 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        ink: "#2E2527",
-        muted: "#6F6265",
-        ivory: "#FCF8F4",
-        blush: "#F5E7E9",
-        wine: "#6E3345",
-        berry: "#9A4F62",
-        sage: "#567568",
-        amber: "#C68B4C",
-        line: "#E8DCDA"
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        muted: "rgb(var(--color-muted) / <alpha-value>)",
+        ivory: "rgb(var(--color-ivory) / <alpha-value>)",
+        blush: "rgb(var(--color-blush) / <alpha-value>)",
+        wine: "rgb(var(--color-wine) / <alpha-value>)",
+        berry: "rgb(var(--color-berry) / <alpha-value>)",
+        sage: "rgb(var(--color-sage) / <alpha-value>)",
+        amber: "rgb(var(--color-amber) / <alpha-value>)",
+        line: "rgb(var(--color-line) / <alpha-value>)"
       },
       fontFamily: {
         display: ["Newsreader", "Georgia", "serif"],
