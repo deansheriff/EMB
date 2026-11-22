@@ -43,6 +43,13 @@ $checks['compiled_css_has_no_hardcoded_wine'] = stripos($css, '110,51,69') === f
 $header = (string) file_get_contents(BASE_PATH . '/views/partials/header.php');
 $checks['logo_replaces_site_name'] = (bool) preg_match('/if \(\$logo\):.*?<img.*?else:.*?site_name.*?endif;/s', $header);
 
+$bootstrap = (string) file_get_contents(BASE_PATH . "/app/bootstrap.php");
+$checks["csp_allows_paystack_checkout_redirect"] = (bool) preg_match("/form-action [^;\"]*https:\/\/checkout\.paystack\.com/", $bootstrap);
+$checks["csp_allows_cloudflare_beacon"] = str_contains($bootstrap, "script-src 'self' https://static.cloudflareinsights.com");
+$entrypoint = (string) file_get_contents(BASE_PATH . "/docker/entrypoint.sh");
+$checks["uploads_live_in_storage_volume"] = str_contains($entrypoint, "ln -s ../storage/uploads");
+$checks["mailer_reports_config_problems"] = is_array(Mailer::configurationProblems());
+
 $passed = !in_array(false, $checks, true);
 echo json_encode(['passed' => $passed, 'checks' => $checks], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), PHP_EOL;
 exit($passed ? 0 : 1);

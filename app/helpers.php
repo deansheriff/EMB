@@ -728,3 +728,24 @@ function excerpt(string $html, int $length = 150): string
     $text = trim(strip_tags($html));
     return mb_strlen($text) <= $length ? $text : mb_substr($text, 0, $length - 1) . '…';
 }
+
+/**
+ * Whether uploaded files sit on a mounted volume that survives a container
+ * redeploy. Returns null outside a Linux container, where this cannot be told.
+ */
+function uploads_storage_is_persistent(): ?bool
+{
+    if (!is_file('/.dockerenv') || !is_readable('/proc/mounts')) {
+        return null;
+    }
+    $mountPoints = [];
+    foreach ((array) @file('/proc/mounts', FILE_IGNORE_NEW_LINES) as $line) {
+        $fields = explode(' ', (string) $line);
+        if (isset($fields[1])) {
+            $mountPoints[] = str_replace('\040', ' ', $fields[1]);
+        }
+    }
+    $root = realpath(BASE_PATH) ?: BASE_PATH;
+    return in_array($root . '/storage', $mountPoints, true)
+        || in_array($root . '/public/uploads', $mountPoints, true);
+}

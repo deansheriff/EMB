@@ -241,12 +241,15 @@ PAYSTACK_SECRET_KEY=sk_live_...
 
 `DB_BOOTSTRAP=true` waits for MySQL and initializes an empty database on first startup. On later deployments it detects existing tables and skips completed initialization. Set it to `false` if database schema changes are managed separately.
 
-Configure persistent storage for both paths so uploads survive deployments:
+Uploaded images are stored in `storage/uploads` (served through a `public/uploads` symlink), so **one persistent volume keeps images, grant documents, and logs across redeploys**. In Coolify open the application → **Persistent Storage** → add a volume with destination path:
 
 ```text
-/var/www/html/public/uploads
 /var/www/html/storage
 ```
+
+Without it, every redeploy starts with an empty upload folder: the deployment log prints a warning and the admin dashboard shows a notice. An existing volume mounted on `/var/www/html/public/uploads` keeps working.
+
+Use **Admin → Email log → Send a test email** to check SMTP delivery; failures show the exact SMTP error. With Brevo, the From email must be a sender verified in Brevo.
 
 SMTP and Paystack variables are optional defaults; you can also configure them after deployment under **Admin → Site settings**. On every start the container replaces the seeded administrator password: with `ADMIN_INITIAL_PASSWORD` if set, otherwise with a random password printed in the deployment log.
 

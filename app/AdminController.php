@@ -31,6 +31,7 @@ function admin_dispatch(string $path): void
         '/admin/appointment-types' => 'appointments.manage',
         '/admin/availability' => 'appointments.manage',
         '/admin/email-log' => 'email_log.view',
+        '/admin/email-test' => 'settings.manage',
         '/admin/page-content' => 'content.manage',
         '/admin/grant-forms' => 'grants.manage',
         '/admin/grant-applications' => 'grants.manage',
@@ -94,6 +95,9 @@ function admin_dispatch(string $path): void
             return;
         case '/admin/email-log':
             admin_email_log();
+            return;
+        case '/admin/email-test':
+            admin_email_test();
             return;
         case '/admin/page-content':
             admin_page_content();
@@ -183,7 +187,8 @@ function admin_dashboard(): void
         : [];
     $heroCount = can('heroes.manage') ? (int) query_value('SELECT COUNT(*) FROM hero_slides WHERE is_active = 1') : null;
     $showMedia = can_any(['events.manage', 'services.manage', 'heroes.manage', 'testimonials.manage', 'content.manage']);
-    render('admin/dashboard', compact('metrics', 'upcoming', 'contacts', 'activity', 'heroCount', 'showMedia') + ['title' => 'Dashboard'], 'admin');
+    $uploadsAtRisk = ($showMedia || can_any(['settings.manage', 'branding.manage'])) && uploads_storage_is_persistent() === false;
+    render('admin/dashboard', compact('metrics', 'upcoming', 'contacts', 'activity', 'heroCount', 'showMedia', 'uploadsAtRisk') + ['title' => 'Dashboard'], 'admin');
 }
 
 function admin_events(): void
@@ -763,7 +768,9 @@ function admin_settings(): void
                 '<h1 style="color:#6e3345;margin-top:0">SMTP is working</h1><p>This test confirms that the website can send email using the SMTP settings saved in the admin dashboard.</p>',
                 'smtp_test'
             );
-            flash($sent ? 'success' : 'error', $sent ? 'Settings saved and the test email was sent.' : 'Settings were saved, but the test email could not be sent. Check the SMTP details and email log.');
+            flash($sent ? 'success' : 'error', $sent
+                ? 'Settings saved and the test email was sent to ' . $recipient . '.'
+                : 'Settings were saved, but the test email could not be sent: ' . (Mailer::lastError() ?? 'unknown error.'));
         } else {
             flash('success', 'Site, email, and payment settings saved.');
         }
@@ -1150,7 +1157,50 @@ function admin_email_log(): void
     $messages = $status === 'all'
         ? query_all('SELECT * FROM email_logs ORDER BY created_at DESC LIMIT 200')
         : query_all('SELECT * FROM email_logs WHERE status = ? ORDER BY created_at DESC LIMIT 200', [$status]);
-    render('admin/email-log', compact('messages', 'status') + ['title' => 'Email log'], 'admin');
+    $canSendTest = can('settings.manage');
+    $testRecipient = (string) ($_SESSION['email_test_recipient'] ?? (auth_user()['email'] ?? ''));
+    $smtpProblems = $canSendTest ? Mailer::configurationProblems() : [];
+    render('admin/email-log', compact('messages', 'status', 'canSendTest', 'testRecipient', 'smtpProblems') + ['title' => 'Email log'], 'admin');
+}
+
+function admin_email_test(): void
+{
+    if (!is_post()) {
+        redirect('/admin/email-log');
+    }
+    verify_csrf();
+    $recipient = trim((string) ($_POST['recipient'] ?? ''));
+    if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+        flash('error', 'Enter a valid email address to send the test to.');
+        redirect('/admin/email-log');
+    }
+    $_SESSION['email_test_recipient'] = $recipient;
+    if (rate_limit_count('email_test', (string) (auth_user()['id'] ?? 0), 60) >= 10) {
+        flash('error', 'Too many test emails in the last minute. Please wait a moment and try again.');
+        redirect('/admin/email-log');
+    }
+    rate_limit_record('email_test', (string) (auth_user()['id'] ?? 0));
+    $problems = Mailer::configurationProblems();
+    if ($problems) {
+        flash('error', 'The test email was not sent. ' . implode(' ', $problems));
+        redirect('/admin/email-log');
+    }
+    $site = (string) setting('site_name', 'Emb Chronicles');
+    $sentAt = (new DateTimeImmutable())->format('j M Y, g:i a');
+    $sent = Mailer::send(
+        $recipient,
+        '',
+        $site . ' test email',
+        '<h1 style="color:#6e3345;margin-top:0">Your website email is working</h1>'
+            . '<p>This test was sent from the ' . e($site) . ' admin dashboard by ' . e((string) (auth_user()['name'] ?? 'an administrator')) . ' on ' . e($sentAt) . '.</p>'
+            . '<p>It was delivered through ' . e((string) setting('smtp_host')) . ' as ' . e((string) setting('smtp_from_email')) . '.</p>',
+        'smtp_test'
+    );
+    audit('send_test_email', 'email_logs', null);
+    flash($sent ? 'success' : 'error', $sent
+        ? 'Test email sent to ' . $recipient . '. Check the inbox (and the spam folder) in a minute.'
+        : 'The test email could not be sent: ' . (Mailer::lastError() ?? 'unknown error.'));
+    redirect('/admin/email-log');
 }
 
 function admin_page_content(): void

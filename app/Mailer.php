@@ -5,6 +5,37 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 final class Mailer
 {
+    private static ?string $lastError = null;
+
+    /** Why the most recent send() did not deliver, or null after a successful send. */
+    public static function lastError(): ?string
+    {
+        return self::$lastError;
+    }
+
+    /**
+     * Plain-language list of settings that stop email from being sent.
+     *
+     * @return list<string>
+     */
+    public static function configurationProblems(): array
+    {
+        $problems = [];
+        if ((string) setting('smtp_enabled', '0') !== '1') {
+            $problems[] = 'SMTP email delivery is switched off. Tick "Enable SMTP email delivery" in Site settings.';
+        }
+        if (trim((string) setting('smtp_host')) === '') {
+            $problems[] = 'No SMTP host is saved (for Brevo: smtp-relay.brevo.com).';
+        }
+        if (!filter_var((string) setting('smtp_from_email'), FILTER_VALIDATE_EMAIL)) {
+            $problems[] = 'No From email is saved. Use a sender address verified in your Brevo account.';
+        }
+        if (trim((string) setting('smtp_username')) !== '' && (string) setting('smtp_password') === '') {
+            $problems[] = 'An SMTP username is saved but the SMTP password (Brevo SMTP key) is empty.';
+        }
+        return $problems;
+    }
+
     public static function enabled(): bool
     {
         return (string) setting('smtp_enabled', '0') === '1'
@@ -129,6 +160,7 @@ final class Mailer
         ?string $relatedType,
         ?int $relatedId
     ): void {
+        self::$lastError = $status === 'sent' ? null : ($error ?? 'The email was not sent.');
         try {
             $stmt = db()->prepare(
                 'INSERT INTO email_logs (recipient, subject, template_key, related_type, related_id, status, error_message)

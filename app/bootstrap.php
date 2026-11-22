@@ -39,7 +39,10 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header("Permissions-Policy: camera=(), microphone=(), geolocation=()");
-header("Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
+// form-action also governs the redirect after a form post, so the Paystack
+// checkout host must be listed or "Continue to secure payment" is blocked.
+// Cloudflare Web Analytics injects its beacon when the site is proxied by Cloudflare.
+header("Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://checkout.paystack.com https://paystack.com");
 
 set_exception_handler(static function (Throwable $exception): void {
     $message = sprintf(

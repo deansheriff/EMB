@@ -1,8 +1,35 @@
 #!/bin/sh
 set -eu
 
-mkdir -p /var/www/html/public/uploads /var/www/html/storage/logs /var/www/html/storage/grant-documents
-chown -R www-data:www-data /var/www/html/public/uploads /var/www/html/storage
+APP_ROOT=/var/www/html
+PUBLIC_UPLOADS="${APP_ROOT}/public/uploads"
+STORAGE_UPLOADS="${APP_ROOT}/storage/uploads"
+
+is_mount() {
+  awk -v path="$1" '$2 == path { found = 1 } END { exit found ? 0 : 1 }' /proc/mounts 2>/dev/null
+}
+
+# Uploaded images live in storage/uploads, reached through a public/uploads
+# symlink, so one persistent volume on /var/www/html/storage keeps images,
+# grant documents, and logs across redeployments. A volume mounted directly on
+# public/uploads (the older setup) is left untouched.
+mkdir -p "${STORAGE_UPLOADS}" "${APP_ROOT}/storage/logs" "${APP_ROOT}/storage/grant-documents"
+if ! is_mount "${PUBLIC_UPLOADS}" && [ ! -L "${PUBLIC_UPLOADS}" ]; then
+  if [ -d "${PUBLIC_UPLOADS}" ]; then
+    cp -an "${PUBLIC_UPLOADS}/." "${STORAGE_UPLOADS}/" 2>/dev/null || true
+    rm -rf "${PUBLIC_UPLOADS}"
+  fi
+  ln -s ../storage/uploads "${PUBLIC_UPLOADS}"
+fi
+chown -R www-data:www-data "${APP_ROOT}/storage"
+if is_mount "${PUBLIC_UPLOADS}"; then
+  chown -R www-data:www-data "${PUBLIC_UPLOADS}"
+fi
+
+if ! is_mount "${APP_ROOT}/storage" && ! is_mount "${PUBLIC_UPLOADS}"; then
+  echo "WARNING: ${APP_ROOT}/storage is not on persistent storage. Uploaded images and grant documents will be lost on the next redeploy." >&2
+  echo "WARNING: In Coolify, add a Persistent Storage volume with destination path ${APP_ROOT}/storage, then redeploy." >&2
+fi
 
 mysql_command() {
   MYSQL_PWD="${DB_PASSWORD:-}" mysql \

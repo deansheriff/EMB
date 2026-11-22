@@ -6,6 +6,12 @@
         <?php if (can('grants.manage')): ?><a class="button button-primary" href="<?= e(url('/admin/grant-applications')) ?>">Review grants</a><?php endif; ?>
     </div>
 </header>
+<?php if (!empty($uploadsAtRisk)): ?>
+    <div class="admin-card mb-6 border-amber bg-blush/40" role="alert">
+        <h2 class="font-bold text-wine">Uploaded images will be lost on the next redeploy</h2>
+        <p class="mt-2 text-sm text-ink">The server's upload folder is not on persistent storage. In Coolify, open this application, go to <strong>Persistent Storage</strong>, add a volume with destination path <code>/var/www/html/storage</code>, and redeploy. Images uploaded before that need to be uploaded again.</p>
+    </div>
+<?php endif; ?>
 
 <?php if ($metrics): ?><section class="admin-metric-grid"><?php foreach ($metrics as [$label, $value, $href, $tone]): ?><a class="metric-card" href="<?= e(url($href)) ?>"><span class="text-sm text-muted"><?= e($label) ?></span><strong class="mt-5 block font-display text-4xl text-wine"><?= (int) $value ?></strong><span class="metric-dot bg-<?= e($tone) ?>"></span></a><?php endforeach; ?></section><?php endif; ?>
 
